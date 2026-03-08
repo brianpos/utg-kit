@@ -1,0 +1,143 @@
+@page "/simulator/valuesets"
+@layout UtgKit.Web.Components.Layout.SimulatorLayout
+@rendermode InteractiveServer
+@inject UtgKit.Core.Services.ThoFileService ThoFileService
+
+<PageTitle>Value Sets — HL7 Terminology (THO)</PageTitle>
+
+<h2>Value Sets</h2>
+
+<p>
+    Browse all value sets published in the HL7 Terminology. Value sets define specific
+    selections of codes from one or more code systems for use in HL7 standards.
+</p>
+
+@if (allItems is null)
+{
+    <p><em>Loading...</em></p>
+}
+else if (allItems.Count == 0)
+{
+    <p>No value sets found. Check the THO repository path in settings.</p>
+}
+else
+{
+    <p><strong>@filtered.Count</strong> of @allItems.Count value sets shown.</p>
+    <table class="tho-list-table">
+        <thead>
+            <tr>
+                <th class="sortable" @onclick='() => Sort("Identity")'>Identity @SortIndicator("Identity")</th>
+                <th class="sortable" @onclick='() => Sort("Name")'>Name @SortIndicator("Name")</th>
+                <th class="sortable" @onclick='() => Sort("Version")'>Version @SortIndicator("Version")</th>
+                <th class="sortable" @onclick='() => Sort("Status")'>Status @SortIndicator("Status")</th>
+                <th class="sortable" @onclick='() => Sort("Owner")'>Owner @SortIndicator("Owner")</th>
+                <th class="sortable" @onclick='() => Sort("Date")'>Date @SortIndicator("Date")</th>
+                <th class="sortable" @onclick='() => Sort("Description")'>Description @SortIndicator("Description")</th>
+            </tr>
+            <tr class="filter-row">
+                <td><input type="text" @bind="filterIdentity" @bind:event="oninput" @bind:after="ApplyFilter" placeholder="Filter…" /></td>
+                <td><input type="text" @bind="filterName" @bind:event="oninput" @bind:after="ApplyFilter" placeholder="Filter…" /></td>
+                <td><input type="text" @bind="filterVersion" @bind:event="oninput" @bind:after="ApplyFilter" placeholder="Filter…" /></td>
+                <td><input type="text" @bind="filterStatus" @bind:event="oninput" @bind:after="ApplyFilter" placeholder="Filter…" /></td>
+                <td><input type="text" @bind="filterOwner" @bind:event="oninput" @bind:after="ApplyFilter" placeholder="Filter…" /></td>
+                <td><input type="text" @bind="filterDate" @bind:event="oninput" @bind:after="ApplyFilter" placeholder="Filter…" /></td>
+                <td><input type="text" @bind="filterDescription" @bind:event="oninput" @bind:after="ApplyFilter" placeholder="Filter…" /></td>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var vs in filtered)
+            {
+                <tr>
+                    <td><a href="/simulator/ValueSet-@(vs.Id).html">@vs.Id</a></td>
+                    <td>@vs.Title</td>
+                    <td>@vs.Version</td>
+                    <td>@vs.Status</td>
+                    <td>@vs.Owner</td>
+                    <td>@DateOnly(vs.Date)</td>
+                    <td title="@vs.Description">@Truncate(vs.Description, 100)</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private IReadOnlyList<UtgKit.Core.Services.ValueSetIndexEntry>? allItems;
+    private List<UtgKit.Core.Services.ValueSetIndexEntry> filtered = [];
+
+    private string filterIdentity = "", filterName = "", filterVersion = "", filterStatus = "";
+    private string filterOwner = "", filterDate = "", filterDescription = "";
+    private string sortColumn = "Identity";
+    private bool sortAscending = true;
+
+    protected override void OnInitialized()
+    {
+        allItems = ThoFileService.GetValueSetIndex();
+        ApplyFilter();
+    }
+
+    private void Sort(string column)
+    {
+        if (sortColumn == column)
+            sortAscending = !sortAscending;
+        else
+        {
+            sortColumn = column;
+            sortAscending = true;
+        }
+        ApplyFilter();
+    }
+
+    private MarkupString SortIndicator(string column)
+        => new(sortColumn == column ? (sortAscending ? "&#9650;" : "&#9660;") : "");
+
+    private void ApplyFilter()
+    {
+        if (allItems is null) return;
+
+        var query = allItems.AsEnumerable();
+
+        if (!string.IsNullOrEmpty(filterIdentity))
+            query = query.Where(e => Contains(e.Id, filterIdentity));
+        if (!string.IsNullOrEmpty(filterName))
+            query = query.Where(e => Contains(e.Title, filterName));
+        if (!string.IsNullOrEmpty(filterVersion))
+            query = query.Where(e => Contains(e.Version, filterVersion));
+        if (!string.IsNullOrEmpty(filterStatus))
+            query = query.Where(e => Contains(e.Status?.ToString(), filterStatus));
+        if (!string.IsNullOrEmpty(filterOwner))
+            query = query.Where(e => Contains(e.Owner, filterOwner));
+        if (!string.IsNullOrEmpty(filterDate))
+            query = query.Where(e => Contains(DateOnly(e.Date), filterDate));
+        if (!string.IsNullOrEmpty(filterDescription))
+            query = query.Where(e => Contains(e.Description, filterDescription));
+
+        query = sortColumn switch
+        {
+            "Identity" => Order(query, e => e.Id),
+            "Name" => Order(query, e => e.Title),
+            "Version" => Order(query, e => e.Version),
+            "Status" => Order(query, e => e.Status?.ToString()),
+            "Owner" => Order(query, e => e.Owner),
+            "Date" => Order(query, e => e.Date),
+            "Description" => Order(query, e => e.Description),
+            _ => query
+        };
+
+        filtered = query.ToList();
+    }
+
+    private IEnumerable<T> Order<T>(IEnumerable<T> source, Func<T, string?> keySelector)
+        => sortAscending
+            ? source.OrderBy(keySelector, StringComparer.OrdinalIgnoreCase)
+            : source.OrderByDescending(keySelector, StringComparer.OrdinalIgnoreCase);
+
+    private static bool Contains(string? value, string filter)
+        => value?.Contains(filter, StringComparison.OrdinalIgnoreCase) == true;
+
+    private static string? DateOnly(string? date)
+        => date?.Length >= 10 ? date[..10] : date;
+
+    private static string? Truncate(string? value, int maxLength)
+        => value is null ? null : value.Length <= maxLength ? value : string.Concat(value.AsSpan(0, maxLength), "...");
+}

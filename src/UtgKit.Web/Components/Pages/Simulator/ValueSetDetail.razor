@@ -1,0 +1,199 @@
+@page "/simulator/ValueSet-{Id}.html"
+@layout UtgKit.Web.Components.Layout.SimulatorLayout
+@rendermode InteractiveServer
+@using Hl7.Fhir.Model
+@inject UtgKit.Core.Services.ThoFileService ThoFileService
+
+<PageTitle>@(valueSet?.Title ?? valueSet?.Name ?? Id) — HL7 Terminology (THO)</PageTitle>
+
+@if (valueSet is null)
+{
+    <div class="tho-alert">
+        <h2>ValueSet Not Found</h2>
+        <p>No ValueSet with id "<strong>@Id</strong>" was found in the local THO repository.</p>
+    </div>
+}
+else
+{
+    <nav class="tho-breadcrumb">
+        <a href="/simulator">Home</a> &rsaquo;
+        <a href="/simulator/valuesets">Value Sets</a> &rsaquo;
+        <span>@(valueSet.Title ?? valueSet.Name)</span>
+    </nav>
+
+    <div class="tho-tab-bar">
+        <button class="tho-tab @(activeTab == Tab.Narrative ? "active" : "")" @onclick="() => activeTab = Tab.Narrative">Narrative Content</button>
+        <button class="tho-tab @(activeTab == Tab.Xml ? "active" : "")" @onclick="() => activeTab = Tab.Xml">XML</button>
+        <button class="tho-tab @(activeTab == Tab.Json ? "active" : "")" @onclick="() => activeTab = Tab.Json">JSON</button>
+    </div>
+
+    @if (activeTab == Tab.Xml)
+    {
+        <CodeBlock Code="@(xmlContent!)" Language="xml" />
+    }
+    else if (activeTab == Tab.Json)
+    {
+        <CodeBlock Code="@(jsonContent!)" Language="json" />
+    }
+    else
+    {
+
+    <h2>ValueSet: @(valueSet.Title ?? valueSet.Name)</h2>
+
+    <table class="tho-metadata">
+        <tr>
+            @if (valueSet.Status.HasValue)
+            {
+                <td><strong>@valueSet.Status</strong> as of @(valueSet.Date ?? "unknown")</td>
+            }
+            @if (fmm is not null)
+            {
+                <td>
+                    <a href="http://hl7.org/fhir/versions.html#maturity" target="_blank">Maturity Level</a>: @fmm
+                </td>
+            }
+            @if (!string.IsNullOrEmpty(valueSet.Publisher))
+            {
+                <td>Responsible: @valueSet.Publisher</td>
+            }
+            @if (!string.IsNullOrEmpty(valueSet.Name))
+            {
+                <td>Computable Name: @valueSet.Name</td>
+            }
+        </tr>
+    </table>
+
+    @if (!string.IsNullOrEmpty(valueSet.Copyright))
+    {
+        <div class="tho-copyright">
+            <strong>Copyright/Legal:</strong> @valueSet.Copyright
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(valueSet.Description?.ToString()))
+    {
+        <p>@valueSet.Description</p>
+    }
+
+    @if (!string.IsNullOrEmpty(valueSet.Purpose))
+    {
+        <p>@valueSet.Purpose</p>
+    }
+
+    <div class="tho-details">
+        @if (valueSet.Meta?.LastUpdated.HasValue == true)
+        {
+            <p>Last updated: @valueSet.Meta.LastUpdated</p>
+        }
+        <p>
+            This value set <code>@valueSet.Url</code>
+            @if (valueSet.Immutable == true)
+            {
+                <text> is immutable and</text>
+            }
+            @if (valueSet.Compose?.Include?.Count > 0)
+            {
+                <text> includes codes from @valueSet.Compose.Include.Count code system(s).</text>
+            }
+        </p>
+    </div>
+
+    @if (valueSet.Compose?.Include?.Count > 0)
+    {
+        @foreach (var include in valueSet.Compose.Include)
+        {
+            <h3>From <code>@include.System</code></h3>
+
+            @if (include.Concept?.Count > 0)
+            {
+                <table class="tho-concept-table">
+                    <thead>
+                        <tr>
+                            <th>Code</th>
+                            <th>Display</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var concept in include.Concept)
+                        {
+                            <tr>
+                                <td><code>@concept.Code</code></td>
+                                <td>@concept.Display</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+            else if (include.Filter?.Count > 0)
+            {
+                <p>Filtered by:</p>
+                <ul>
+                    @foreach (var filter in include.Filter)
+                    {
+                        <li><code>@filter.Property</code> @filter.Op <code>@filter.Value</code></li>
+                    }
+                </ul>
+            }
+            else
+            {
+                <p>All codes from this system are included.</p>
+            }
+        }
+    }
+
+    @if (valueSet.Expansion?.Contains?.Count > 0)
+    {
+        <h3>Expansion</h3>
+        <table class="tho-concept-table">
+            <thead>
+                <tr>
+                    <th>Code</th>
+                    <th>System</th>
+                    <th>Display</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in valueSet.Expansion.Contains)
+                {
+                    <tr>
+                        <td><code>@item.Code</code></td>
+                        <td>@item.System</td>
+                        <td>@item.Display</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+
+    <ResourceHistory ResourceReference="@($"ValueSet/{Id}")" />
+
+    } @* end Narrative tab *@
+}
+
+@code {
+    [Parameter]
+    public string Id { get; set; } = default!;
+
+    private ValueSet? valueSet;
+    private string? fmm;
+    private Tab activeTab = Tab.Narrative;
+    private string? xmlContent;
+    private string? jsonContent;
+
+    private enum Tab { Narrative, Xml, Json }
+
+    protected override void OnParametersSet()
+    {
+        valueSet = ThoFileService.LoadValueSet(Id);
+
+        fmm = valueSet?.Extension
+            ?.FirstOrDefault(e => e.Url == "http://hl7.org/fhir/StructureDefinition/structuredefinition-fmm")
+            ?.Value?.ToString();
+
+        if (valueSet is not null)
+        {
+            xmlContent = ThoFileService.SerializeToXml(valueSet);
+            jsonContent = ThoFileService.SerializeToJson(valueSet);
+        }
+    }
+}

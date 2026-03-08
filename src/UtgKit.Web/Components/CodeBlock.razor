@@ -1,0 +1,40 @@
+@inject IJSRuntime JS
+
+<pre class="tho-source-view"><code class="language-@Language" @ref="codeElement">@Code</code></pre>
+
+@code {
+    [Parameter, EditorRequired]
+    public string Code { get; set; } = string.Empty;
+
+    [Parameter, EditorRequired]
+    public string Language { get; set; } = "plaintext";
+
+    private ElementReference codeElement;
+    private bool _needsHighlight;
+
+    protected override void OnParametersSet()
+    {
+        _needsHighlight = true;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_needsHighlight)
+        {
+            _needsHighlight = false;
+            await HighlightAsync();
+        }
+    }
+
+    private async Task HighlightAsync()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("hljs.highlightElement", codeElement);
+        }
+        catch (InvalidOperationException)
+        {
+            // Prerendering — no JS available yet
+        }
+    }
+}

@@ -1,0 +1,149 @@
+@page "/simulator/codesystems"
+@layout UtgKit.Web.Components.Layout.SimulatorLayout
+@rendermode InteractiveServer
+@inject UtgKit.Core.Services.ThoFileService ThoFileService
+
+<PageTitle>Code Systems — HL7 Terminology (THO)</PageTitle>
+
+<h2>HL7 Code Systems</h2>
+
+<p>
+    Browse all code systems published in the HL7 Terminology. This includes code systems
+    from CDA, FHIR, V2, V3, unified, and external sources.
+</p>
+
+@if (allItems is null)
+{
+    <p><em>Loading...</em></p>
+}
+else if (allItems.Count == 0)
+{
+    <p>No code systems found. Check the THO repository path in settings.</p>
+}
+else
+{
+    <p><strong>@filtered.Count</strong> of @allItems.Count code systems shown.</p>
+    <table class="tho-list-table">
+        <thead>
+            <tr>
+                <th class="sortable" @onclick='() => Sort("Identity")'>Identity @SortIndicator("Identity")</th>
+                <th class="sortable" @onclick='() => Sort("Name")'>Name @SortIndicator("Name")</th>
+                <th class="sortable" @onclick='() => Sort("Version")'>Version @SortIndicator("Version")</th>
+                <th class="sortable" @onclick='() => Sort("Status")'>Status @SortIndicator("Status")</th>
+                <th class="sortable" @onclick='() => Sort("Content")'>Content @SortIndicator("Content")</th>
+                <th class="sortable" @onclick='() => Sort("Owner")'>Owner @SortIndicator("Owner")</th>
+                <th class="sortable" @onclick='() => Sort("Date")'>Date @SortIndicator("Date")</th>
+                <th class="sortable" @onclick='() => Sort("Description")'>Description @SortIndicator("Description")</th>
+            </tr>
+            <tr class="filter-row">
+                <td><input type="text" @bind="filterIdentity" @bind:event="oninput" @bind:after="ApplyFilter" placeholder="Filter…" /></td>
+                <td><input type="text" @bind="filterName" @bind:event="oninput" @bind:after="ApplyFilter" placeholder="Filter…" /></td>
+                <td><input type="text" @bind="filterVersion" @bind:event="oninput" @bind:after="ApplyFilter" placeholder="Filter…" /></td>
+                <td><input type="text" @bind="filterStatus" @bind:event="oninput" @bind:after="ApplyFilter" placeholder="Filter…" /></td>
+                <td><input type="text" @bind="filterContent" @bind:event="oninput" @bind:after="ApplyFilter" placeholder="Filter…" /></td>
+                <td><input type="text" @bind="filterOwner" @bind:event="oninput" @bind:after="ApplyFilter" placeholder="Filter…" /></td>
+                <td><input type="text" @bind="filterDate" @bind:event="oninput" @bind:after="ApplyFilter" placeholder="Filter…" /></td>
+                <td><input type="text" @bind="filterDescription" @bind:event="oninput" @bind:after="ApplyFilter" placeholder="Filter…" /></td>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var cs in filtered)
+            {
+                <tr>
+                    <td><a href="/simulator/CodeSystem-@(cs.Id).html">@cs.Id</a></td>
+                    <td>@cs.Title</td>
+                    <td>@cs.Version</td>
+                    <td>@cs.Status</td>
+                    <td>@cs.Content</td>
+                    <td>@cs.Owner</td>
+                    <td>@DateOnly(cs.Date)</td>
+                    <td title="@cs.Description">@Truncate(cs.Description, 100)</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private IReadOnlyList<UtgKit.Core.Services.CodeSystemIndexEntry>? allItems;
+    private List<UtgKit.Core.Services.CodeSystemIndexEntry> filtered = [];
+
+    private string filterIdentity = "", filterName = "", filterVersion = "", filterStatus = "";
+    private string filterContent = "", filterOwner = "", filterDate = "", filterDescription = "";
+    private string sortColumn = "Identity";
+    private bool sortAscending = true;
+
+    protected override void OnInitialized()
+    {
+        allItems = ThoFileService.GetCodeSystemIndex();
+        ApplyFilter();
+    }
+
+    private void Sort(string column)
+    {
+        if (sortColumn == column)
+            sortAscending = !sortAscending;
+        else
+        {
+            sortColumn = column;
+            sortAscending = true;
+        }
+        ApplyFilter();
+    }
+
+    private MarkupString SortIndicator(string column)
+        => new(sortColumn == column ? (sortAscending ? "&#9650;" : "&#9660;") : "");
+
+    private void ApplyFilter()
+    {
+        if (allItems is null) return;
+
+        var query = allItems.AsEnumerable();
+
+        if (!string.IsNullOrEmpty(filterIdentity))
+            query = query.Where(e => Contains(e.Id, filterIdentity));
+        if (!string.IsNullOrEmpty(filterName))
+            query = query.Where(e => Contains(e.Title, filterName));
+        if (!string.IsNullOrEmpty(filterVersion))
+            query = query.Where(e => Contains(e.Version, filterVersion));
+        if (!string.IsNullOrEmpty(filterStatus))
+            query = query.Where(e => Contains(e.Status?.ToString(), filterStatus));
+        if (!string.IsNullOrEmpty(filterContent))
+            query = query.Where(e => Contains(e.Content?.ToString(), filterContent));
+        if (!string.IsNullOrEmpty(filterOwner))
+            query = query.Where(e => Contains(e.Owner, filterOwner));
+        if (!string.IsNullOrEmpty(filterDate))
+            query = query.Where(e => Contains(DateOnly(e.Date), filterDate));
+        if (!string.IsNullOrEmpty(filterDescription))
+            query = query.Where(e => Contains(e.Description, filterDescription));
+
+        query = sortColumn switch
+        {
+            "Identity" => Order(query, e => e.Id),
+            "Name" => Order(query, e => e.Title),
+            "Version" => Order(query, e => e.Version),
+            "Status" => Order(query, e => e.Status?.ToString()),
+            "Content" => Order(query, e => e.Content?.ToString()),
+            "Owner" => Order(query, e => e.Owner),
+            "Date" => Order(query, e => e.Date),
+            "Description" => Order(query, e => e.Description),
+            _ => query
+        };
+
+        filtered = query.ToList();
+    }
+
+    private IEnumerable<T> Order<T>(IEnumerable<T> source, Func<T, string?> keySelector)
+        => sortAscending
+            ? source.OrderBy(keySelector, StringComparer.OrdinalIgnoreCase)
+            : source.OrderByDescending(keySelector, StringComparer.OrdinalIgnoreCase);
+
+    private static bool Contains(string? value, string filter)
+        => value?.Contains(filter, StringComparison.OrdinalIgnoreCase) == true;
+
+    private static string? DateOnly(string? date)
+        => date?.Length >= 10 ? date[..10] : date;
+
+    private static string? Truncate(string? value, int maxLength)
+        => value is null ? null : value.Length <= maxLength ? value : string.Concat(value.AsSpan(0, maxLength), "...");
+}

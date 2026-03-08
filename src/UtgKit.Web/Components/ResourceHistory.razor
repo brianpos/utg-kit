@@ -1,0 +1,46 @@
+@inject UtgKit.Core.Services.ThoFileService ThoFileService
+
+@if (entries.Count > 0)
+{
+    <h3>History</h3>
+    <table class="tho-history-table">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Activity</th>
+                <th>Author</th>
+                <th>Custodian</th>
+                <th>Detail</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var entry in entries)
+            {
+                <tr>
+                    <td><a href="/simulator/Bundle-@(entry.BundleId).html">@entry.Date</a></td>
+                    <td>
+                        @if (!string.IsNullOrEmpty(entry.ActivityCode))
+                        {
+                            <a href="/simulator/CodeSystem-v3-DataOperation.html">@(entry.ActivityDisplay ?? entry.ActivityCode)</a>
+                        }
+                    </td>
+                    <td>@entry.Author</td>
+                    <td>@entry.AuthorizingGroup</td>
+                    <td>@entry.Detail</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public string ResourceReference { get; set; } = default!;
+
+    private IReadOnlyList<UtgKit.Core.Services.HistoryEntry> entries = [];
+
+    protected override void OnParametersSet()
+    {
+        entries = ThoFileService.GetResourceHistory(ResourceReference);
+    }
+}

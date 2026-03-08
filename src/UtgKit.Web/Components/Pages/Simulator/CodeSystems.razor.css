@@ -1,0 +1,53 @@
+.tho-list-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+    margin-top: 1rem;
+}
+
+.tho-list-table th {
+    text-align: left;
+    padding: 0.5rem 0.75rem;
+    background: #f1f1f1;
+    border: 1px solid #dee2e6;
+    font-weight: 600;
+}
+
+.tho-list-table th.sortable {
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+}
+
+.tho-list-table th.sortable:hover {
+    background: #e2e6ea;
+}
+
+.tho-list-table td {
+    padding: 0.4rem 0.75rem;
+    border: 1px solid #dee2e6;
+    vertical-align: top;
+}
+
+.tho-list-table a {
+    color: #005daa;
+    text-decoration: none;
+}
+
+.tho-list-table a:hover {
+    text-decoration: underline;
+}
+
+.filter-row td {
+    padding: 0.25rem 0.4rem;
+    background: #fafafa;
+}
+
+.filter-row input {
+    width: 100%;
+    padding: 0.2rem 0.4rem;
+    font-size: 0.8rem;
+    border: 1px solid #ced4da;
+    border-radius: 3px;
+    box-sizing: border-box;
+}

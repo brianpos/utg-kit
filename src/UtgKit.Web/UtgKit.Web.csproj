@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>UtgKit.Web</RootNamespace>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\UtgKit.Core\UtgKit.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="brianpos.Fhir.R4.WebApi.AspNetCore" Version="5.11.4-rc1" />
+    <PackageReference Include="Hl7.Fhir.R4" Version="5.13.2" />
+    <PackageReference Include="ModelContextProtocol.AspNetCore" Version="0.*" />
+  </ItemGroup>
+
+</Project>

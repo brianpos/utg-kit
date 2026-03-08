@@ -1,0 +1,164 @@
+@page "/simulator/CodeSystem-{Id}.html"
+@layout UtgKit.Web.Components.Layout.SimulatorLayout
+@rendermode InteractiveServer
+@using Hl7.Fhir.Model
+@inject UtgKit.Core.Services.ThoFileService ThoFileService
+
+<PageTitle>@(codeSystem?.Title ?? codeSystem?.Name ?? Id) — HL7 Terminology (THO)</PageTitle>
+
+@if (codeSystem is null)
+{
+    <div class="tho-alert">
+        <h2>CodeSystem Not Found</h2>
+        <p>No CodeSystem with id "<strong>@Id</strong>" was found in the local THO repository.</p>
+    </div>
+}
+else
+{
+    <nav class="tho-breadcrumb">
+        <a href="/simulator">Home</a> &rsaquo;
+        <a href="/simulator/codesystems">Code Systems</a> &rsaquo;
+        <span>@(codeSystem.Title ?? codeSystem.Name)</span>
+    </nav>
+
+    <div class="tho-tab-bar">
+        <button class="tho-tab @(activeTab == Tab.Narrative ? "active" : "")" @onclick="() => activeTab = Tab.Narrative">Narrative Content</button>
+        <button class="tho-tab @(activeTab == Tab.Xml ? "active" : "")" @onclick="() => activeTab = Tab.Xml">XML</button>
+        <button class="tho-tab @(activeTab == Tab.Json ? "active" : "")" @onclick="() => activeTab = Tab.Json">JSON</button>
+    </div>
+
+    @if (activeTab == Tab.Xml)
+    {
+        <CodeBlock Code="@(xmlContent!)" Language="xml" />
+    }
+    else if (activeTab == Tab.Json)
+    {
+        <CodeBlock Code="@(jsonContent!)" Language="json" />
+    }
+    else
+    {
+
+    <h2>CodeSystem: @(codeSystem.Title ?? codeSystem.Name)</h2>
+
+    <table class="tho-metadata">
+        <tr>
+            @if (codeSystem.Status.HasValue)
+            {
+                <td><strong>@codeSystem.Status</strong> as of @(codeSystem.Date ?? "unknown")</td>
+            }
+            @if (fmm is not null)
+            {
+                <td>
+                    <a href="http://hl7.org/fhir/versions.html#maturity" target="_blank">Maturity Level</a>: @fmm
+                </td>
+            }
+            @if (!string.IsNullOrEmpty(codeSystem.Publisher))
+            {
+                <td>Responsible: @codeSystem.Publisher</td>
+            }
+            @if (!string.IsNullOrEmpty(codeSystem.Name))
+            {
+                <td>Computable Name: @codeSystem.Name</td>
+            }
+        </tr>
+    </table>
+
+    @if (!string.IsNullOrEmpty(codeSystem.Copyright))
+    {
+        <div class="tho-copyright">
+            <strong>Copyright/Legal:</strong> @codeSystem.Copyright
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(codeSystem.Description?.ToString()))
+    {
+        <p>@codeSystem.Description</p>
+    }
+
+    @if (!string.IsNullOrEmpty(codeSystem.Purpose))
+    {
+        <p>@codeSystem.Purpose</p>
+    }
+
+    <div class="tho-details">
+        @if (codeSystem.Meta?.LastUpdated.HasValue == true)
+        {
+            <p>Last updated: @codeSystem.Meta.LastUpdated</p>
+        }
+        <p>
+            This @(codeSystem.CaseSensitive == true ? "case-sensitive " : "")code system
+            <code>@codeSystem.Url</code> defines the following codes:
+        </p>
+    </div>
+
+    @if (codeSystem.Concept?.Count > 0)
+    {
+        <table class="tho-concept-table">
+            <thead>
+                <tr>
+                    <th>Code</th>
+                    <th>Display</th>
+                    <th>Definition</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var concept in FlattenConcepts(codeSystem.Concept))
+                {
+                    <tr>
+                        <td><code>@concept.Code</code></td>
+                        <td>@concept.Display</td>
+                        <td>@concept.Definition</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+
+    <ResourceHistory ResourceReference="@($"CodeSystem/{Id}")" />
+
+    } @* end Narrative tab *@
+}
+
+@code {
+    [Parameter]
+    public string Id { get; set; } = default!;
+
+    private CodeSystem? codeSystem;
+    private string? fmm;
+    private Tab activeTab = Tab.Narrative;
+    private string? xmlContent;
+    private string? jsonContent;
+
+    private enum Tab { Narrative, Xml, Json }
+
+    protected override void OnParametersSet()
+    {
+        codeSystem = ThoFileService.LoadCodeSystem(Id);
+
+        // Extract FMM (FHIR Maturity Model) level from extensions
+        fmm = codeSystem?.Extension
+            ?.FirstOrDefault(e => e.Url == "http://hl7.org/fhir/StructureDefinition/structuredefinition-fmm")
+            ?.Value?.ToString();
+
+        if (codeSystem is not null)
+        {
+            xmlContent = ThoFileService.SerializeToXml(codeSystem);
+            jsonContent = ThoFileService.SerializeToJson(codeSystem);
+        }
+    }
+
+    /// <summary>
+    /// Recursively flattens nested concept hierarchies into a single list.
+    /// </summary>
+    private static IEnumerable<CodeSystem.ConceptDefinitionComponent> FlattenConcepts(
+        List<CodeSystem.ConceptDefinitionComponent>? concepts)
+    {
+        if (concepts is null) yield break;
+        foreach (var concept in concepts)
+        {
+            yield return concept;
+            foreach (var child in FlattenConcepts(concept.Concept))
+                yield return child;
+        }
+    }
+}

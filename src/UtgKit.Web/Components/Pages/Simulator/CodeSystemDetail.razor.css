@@ -1,0 +1,146 @@
+.tho-breadcrumb {
+    font-size: 0.85rem;
+    color: #666;
+    margin-bottom: 1rem;
+}
+
+.tho-breadcrumb a {
+    color: #005daa;
+    text-decoration: none;
+}
+
+.tho-breadcrumb a:hover {
+    text-decoration: underline;
+}
+
+/* Tab strip */
+.tho-tab-bar {
+    display: flex;
+    gap: 0;
+    border-bottom: 2px solid #dee2e6;
+    margin-bottom: 1rem;
+}
+
+.tho-tab {
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    color: #495057;
+    cursor: pointer;
+    border: 1px solid transparent;
+    border-bottom: none;
+    background: transparent;
+}
+
+.tho-tab:hover:not(.active) {
+    color: #212529;
+    background: #f8f9fa;
+}
+
+.tho-tab.active {
+    color: #212529;
+    background: #fff;
+    border-color: #dee2e6;
+    border-bottom: 2px solid #fff;
+    margin-bottom: -2px;
+    font-weight: 600;
+}
+
+/* Metadata bar */
+.tho-metadata {
+    width: 100%;
+    border: 1px solid #dee2e6;
+    border-collapse: collapse;
+    margin-bottom: 1rem;
+    font-size: 0.875rem;
+}
+
+.tho-metadata td {
+    padding: 0.4rem 0.75rem;
+    border: 1px solid #dee2e6;
+    background: #f8f9fa;
+}
+
+.tho-metadata a {
+    color: #005daa;
+    text-decoration: none;
+}
+
+/* Copyright */
+.tho-copyright {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.85rem;
+    margin-bottom: 1rem;
+}
+
+/* Details text */
+.tho-details {
+    margin-bottom: 1rem;
+    font-size: 0.9rem;
+}
+
+.tho-details code {
+    background: #f0f0f0;
+    padding: 0.1em 0.3em;
+    border-radius: 3px;
+    font-size: 0.85em;
+}
+
+/* Concept table */
+.tho-concept-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 1.5rem;
+    font-size: 0.875rem;
+}
+
+.tho-concept-table th {
+    text-align: left;
+    padding: 0.5rem 0.75rem;
+    background: #f1f1f1;
+    border: 1px solid #dee2e6;
+    font-weight: 600;
+}
+
+.tho-concept-table td {
+    padding: 0.4rem 0.75rem;
+    border: 1px solid #dee2e6;
+    vertical-align: top;
+}
+
+.tho-concept-table code {
+    background: #f0f0f0;
+    padding: 0.1em 0.3em;
+    border-radius: 3px;
+    font-size: 0.85em;
+    white-space: nowrap;
+}
+
+/* Not-found alert */
+.tho-alert {
+    border: 1px solid #f5c6cb;
+    background: #f8d7da;
+    color: #721c24;
+    padding: 1rem;
+    border-radius: 4px;
+    margin: 1rem 0;
+}
+
+/* XML / JSON source view */
+.tho-source-view {
+    background: #f6f8fa;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    padding: 1rem;
+    overflow-x: auto;
+    font-size: 0.8rem;
+    line-height: 1.5;
+    max-height: 70vh;
+    overflow-y: auto;
+}
+
+.tho-source-view code {
+    white-space: pre;
+    font-family: "Cascadia Code", "Fira Code", Consolas, "Courier New", monospace;
+}
