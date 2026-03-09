@@ -1,4 +1,4 @@
-@page "/simulator/CodeSystem-{Id}.html"
+@page "/CodeSystem-{Id}.html"
 @layout UtgKit.Web.Components.Layout.SimulatorLayout
 @rendermode InteractiveServer
 @using Hl7.Fhir.Model
@@ -16,8 +16,8 @@
 else
 {
     <nav class="tho-breadcrumb">
-        <a href="/simulator">Home</a> &rsaquo;
-        <a href="/simulator/codesystems">Code Systems</a> &rsaquo;
+        <a href="/">Home</a> &rsaquo;
+        <a href="/codesystems">Code Systems</a> &rsaquo;
         <span>@(codeSystem.Title ?? codeSystem.Name)</span>
     </nav>
 

@@ -1,4 +1,4 @@
-@page "/simulator/ValueSet-{Id}.html"
+@page "/ValueSet-{Id}.html"
 @layout UtgKit.Web.Components.Layout.SimulatorLayout
 @rendermode InteractiveServer
 @using Hl7.Fhir.Model
@@ -16,8 +16,8 @@
 else
 {
     <nav class="tho-breadcrumb">
-        <a href="/simulator">Home</a> &rsaquo;
-        <a href="/simulator/valuesets">Value Sets</a> &rsaquo;
+        <a href="/">Home</a> &rsaquo;
+        <a href="/valuesets">Value Sets</a> &rsaquo;
         <span>@(valueSet.Title ?? valueSet.Name)</span>
     </nav>
 
