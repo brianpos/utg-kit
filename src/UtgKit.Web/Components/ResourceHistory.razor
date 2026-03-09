@@ -17,11 +17,11 @@
             @foreach (var entry in entries)
             {
                 <tr>
-                    <td><a href="/simulator/Bundle-@(entry.BundleId).html">@entry.Date</a></td>
+                    <td><a href="/Bundle-@(entry.BundleId).html">@entry.Date</a></td>
                     <td>
                         @if (!string.IsNullOrEmpty(entry.ActivityCode))
                         {
-                            <a href="/simulator/CodeSystem-v3-DataOperation.html">@(entry.ActivityDisplay ?? entry.ActivityCode)</a>
+                            <a href="/CodeSystem-v3-DataOperation.html">@(entry.ActivityDisplay ?? entry.ActivityCode)</a>
                         }
                     </td>
                     <td>@entry.Author</td>

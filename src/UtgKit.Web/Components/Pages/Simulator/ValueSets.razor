@@ -1,4 +1,4 @@
-@page "/simulator/valuesets"
+@page "/valuesets"
 @layout UtgKit.Web.Components.Layout.SimulatorLayout
 @rendermode InteractiveServer
 @inject UtgKit.Core.Services.ThoFileService ThoFileService
@@ -48,7 +48,7 @@ else
             @foreach (var vs in filtered)
             {
                 <tr>
-                    <td><a href="/simulator/ValueSet-@(vs.Id).html">@vs.Id</a></td>
+                    <td><a href="/ValueSet-@(vs.Id).html">@vs.Id</a></td>
                     <td>@vs.Title</td>
                     <td>@vs.Version</td>
                     <td>@vs.Status</td>

@@ -1,4 +1,4 @@
-@page "/simulator/codesystems"
+@page "/codesystems"
 @layout UtgKit.Web.Components.Layout.SimulatorLayout
 @rendermode InteractiveServer
 @inject UtgKit.Core.Services.ThoFileService ThoFileService
@@ -50,7 +50,7 @@ else
             @foreach (var cs in filtered)
             {
                 <tr>
-                    <td><a href="/simulator/CodeSystem-@(cs.Id).html">@cs.Id</a></td>
+                    <td><a href="/CodeSystem-@(cs.Id).html">@cs.Id</a></td>
                     <td>@cs.Title</td>
                     <td>@cs.Version</td>
                     <td>@cs.Status</td>
