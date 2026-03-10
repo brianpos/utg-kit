@@ -152,6 +152,27 @@ public class ImportValueSetService
            || ExcludedCodeSystemPrefixes.Any(p => canonicalUrl.StartsWith(p, StringComparison.OrdinalIgnoreCase));
 
     /// <summary>
+    /// Extracts the base URL (everything up to and including the last '/') from a
+    /// fully-qualified resource URL. This is used to resolve sibling resources from the
+    /// same FHIR publication server or Implementation Guide.
+    /// For example, "https://build.fhir.org/ig/HL7/admin-incubator/en/ValueSet-Foo.json"
+    /// returns "https://build.fhir.org/ig/HL7/admin-incubator/en/".
+    /// </summary>
+    public static string? ExtractBaseUrl(string url)
+    {
+        if (!Uri.TryCreate(url.Trim(), UriKind.Absolute, out var uri))
+            return null;
+
+        var path = uri.AbsolutePath;
+        var lastSlash = path.LastIndexOf('/');
+        if (lastSlash < 0)
+            return null;
+
+        var basePath = path[..(lastSlash + 1)];
+        return new UriBuilder(uri) { Path = basePath, Query = "", Fragment = "" }.Uri.AbsoluteUri;
+    }
+
+    /// <summary>
     /// Attempts to convert a CodeSystem canonical URL to a FHIR core build download URL.
     /// For example, "http://hl7.org/fhir/action-type" becomes
     /// "https://build.fhir.org/codesystem-action-type.json".
@@ -177,6 +198,39 @@ public class ImportValueSetService
             return null;
 
         return $"https://build.fhir.org/codesystem-{suffix}.json";
+    }
+
+    /// <summary>
+    /// Resolves a CodeSystem canonical URL to a download URL.
+    /// When a <paramref name="sourceBaseUrl"/> is provided (derived from the source
+    /// ValueSet URL), it first attempts to construct a download URL relative to that
+    /// base (e.g. "{baseUrl}CodeSystem-{name}.json"). This allows importing from any
+    /// FHIR publication server or Implementation Guide.
+    /// Falls back to the FHIR core build URL pattern for canonical URLs under
+    /// "http://hl7.org/fhir/".
+    /// Returns null for excluded external terminologies or unrecognized canonical URLs.
+    /// </summary>
+    public static string? ResolveCodeSystemDownloadUrl(string canonicalUrl, string? sourceBaseUrl)
+    {
+        if (IsExcludedCodeSystem(canonicalUrl))
+            return null;
+
+        // Try the FHIR core build pattern first (http://hl7.org/fhir/{name})
+        var coreBuildUrl = CanonicalToFhirBuildUrl(canonicalUrl);
+        if (coreBuildUrl is not null)
+            return coreBuildUrl;
+
+        // If we have a source base URL, try to resolve relative to it using
+        // the last path segment of the canonical URL as the resource name.
+        if (sourceBaseUrl is not null && Uri.TryCreate(canonicalUrl, UriKind.Absolute, out var canonicalUri))
+        {
+            var segments = canonicalUri.AbsolutePath.TrimEnd('/').Split('/');
+            var name = segments[^1];
+            if (!string.IsNullOrEmpty(name))
+                return $"{sourceBaseUrl.TrimEnd('/')}/CodeSystem-{name}.json";
+        }
+
+        return null;
     }
 
     /// <summary>
@@ -238,14 +292,15 @@ public class ImportValueSetService
         var codeSystemResults = new List<ImportCodeSystemResult>();
         if (importReferencedCodeSystems)
         {
+            var sourceBaseUrl = ExtractBaseUrl(jsonUrl);
             var referencedUrls = GetReferencedCodeSystemUrls(valueSet);
             foreach (var canonicalUrl in referencedUrls)
             {
-                var buildUrl = CanonicalToFhirBuildUrl(canonicalUrl);
+                var buildUrl = ResolveCodeSystemDownloadUrl(canonicalUrl, sourceBaseUrl);
                 if (buildUrl is null)
                 {
                     _logger.LogInformation(
-                        "Skipping CodeSystem {Url} — not a FHIR core canonical URL", canonicalUrl);
+                        "Skipping CodeSystem {Url} — excluded or unresolvable canonical URL", canonicalUrl);
                     continue;
                 }
 

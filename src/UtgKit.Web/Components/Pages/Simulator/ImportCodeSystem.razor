@@ -11,15 +11,16 @@
 <nav class="tho-breadcrumb">
     <a href="/">Home</a> &rsaquo;
     <a href="/codesystems">Code Systems</a> &rsaquo;
-    <span>Import from FHIR Core Build</span>
+    <span>Import CodeSystem</span>
 </nav>
 
-<h2>Import CodeSystem from FHIR Core Build</h2>
+<h2>Import CodeSystem from FHIR Publication</h2>
 
 <div class="import-description">
     <p>
-        Use this page to import a CodeSystem resource from the
-        <a href="https://build.fhir.org" target="_blank">FHIR core build</a> into your local THO repository.
+        Use this page to import a CodeSystem resource from any FHIR publication — including the
+        <a href="https://build.fhir.org" target="_blank">FHIR core build</a> and
+        HL7 FHIR Implementation Guides — into your local THO repository.
         The resource will be downloaded from the URL you provide, converted to the THO format,
         and placed in the appropriate directory within the repository.
     </p>
@@ -35,14 +36,14 @@
         <input id="importUrl"
                type="url"
                class="form-input"
-               placeholder="https://build.fhir.org/codesystem-encounter-businessstatus-inpatient.html"
+               placeholder="https://build.fhir.org/codesystem-encounter-businessstatus-inpatient.html or IG URL"
                @bind="importUrl"
                @bind:event="oninput" />
         <span class="form-hint">
-            Enter the URL from the FHIR core build site. The path must contain
-            "<code>codesystem-</code>" so the resource type can be verified. Any <code>.html</code>
-            or <code>.xml</code> extension will be converted to <code>.json</code> for download
-            automatically.
+            Enter the URL of a CodeSystem from the FHIR core build or an Implementation Guide.
+            The filename must start with "<code>codesystem-</code>" or "<code>CodeSystem-</code>".
+            Any <code>.html</code> or <code>.xml</code> extension will be converted to
+            <code>.json</code> for download automatically.
         </span>
         @if (urlValidationError is not null)
         {

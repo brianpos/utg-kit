@@ -11,15 +11,16 @@
 <nav class="tho-breadcrumb">
     <a href="/">Home</a> &rsaquo;
     <a href="/valuesets">Value Sets</a> &rsaquo;
-    <span>Import from FHIR Core Build</span>
+    <span>Import ValueSet</span>
 </nav>
 
-<h2>Import ValueSet from FHIR Core Build</h2>
+<h2>Import ValueSet from FHIR Publication</h2>
 
 <div class="import-description">
     <p>
-        Use this page to import a ValueSet resource from the
-        <a href="https://build.fhir.org" target="_blank">FHIR core build</a> into your local THO repository.
+        Use this page to import a ValueSet resource from any FHIR publication — including the
+        <a href="https://build.fhir.org" target="_blank">FHIR core build</a> and
+        HL7 FHIR Implementation Guides — into your local THO repository.
         The resource will be downloaded from the URL you provide, converted to the THO format,
         and placed in the appropriate directory within the repository.
     </p>
@@ -35,14 +36,14 @@
         <input id="importUrl"
                type="url"
                class="form-input"
-               placeholder="https://build.fhir.org/valueset-action-type.html"
+               placeholder="https://build.fhir.org/valueset-action-type.html or IG URL"
                @bind="importUrl"
                @bind:event="oninput" />
         <span class="form-hint">
-            Enter the URL from the FHIR core build site. The path must contain
-            "<code>valueset-</code>" so the resource type can be verified. Any <code>.html</code>
-            or <code>.xml</code> extension will be converted to <code>.json</code> for download
-            automatically.
+            Enter the URL of a ValueSet from the FHIR core build or an Implementation Guide.
+            The filename must start with "<code>valueset-</code>" or "<code>ValueSet-</code>".
+            Any <code>.html</code> or <code>.xml</code> extension will be converted to
+            <code>.json</code> for download automatically.
         </span>
         @if (urlValidationError is not null)
         {
@@ -100,8 +101,8 @@
         </label>
         <span class="form-hint">
             When checked, the importer will attempt to download and save any CodeSystems referenced
-            in the ValueSet's <code>compose.include</code> elements from the FHIR core build.
-            CodeSystems that already exist in the repository will be skipped.
+            in the ValueSet's <code>compose.include</code> elements from the same server or the
+            FHIR core build. CodeSystems that already exist in the repository will be skipped.
         </span>
     </div>
 
