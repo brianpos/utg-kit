@@ -1,0 +1,213 @@
+@page "/codesystems/import"
+@layout UtgKit.Web.Components.Layout.SimulatorLayout
+@rendermode InteractiveServer
+@inject NavigationManager Navigation
+@inject UtgKit.Core.Services.ThoFileService ThoFileService
+@inject UtgKit.Core.Services.ImportCodeSystemService ImportService
+@inject IJSRuntime JS
+
+<PageTitle>Import CodeSystem — HL7 Terminology (THO)</PageTitle>
+
+<nav class="tho-breadcrumb">
+    <a href="/">Home</a> &rsaquo;
+    <a href="/codesystems">Code Systems</a> &rsaquo;
+    <span>Import from FHIR Core Build</span>
+</nav>
+
+<h2>Import CodeSystem from FHIR Core Build</h2>
+
+<div class="import-description">
+    <p>
+        Use this page to import a CodeSystem resource from the
+        <a href="https://build.fhir.org" target="_blank">FHIR core build</a> into your local THO repository.
+        The resource will be downloaded from the URL you provide, converted to the THO format,
+        and placed in the appropriate directory within the repository.
+    </p>
+    <p>
+        A changelog entry will be created using the comment you supply below. This comment should
+        describe why the CodeSystem is being imported and any relevant context for other contributors.
+    </p>
+</div>
+
+<div class="import-form">
+    <div class="form-group">
+        <label for="importUrl">CodeSystem URL</label>
+        <input id="importUrl"
+               type="url"
+               class="form-input"
+               placeholder="https://build.fhir.org/codesystem-encounter-businessstatus-inpatient.html"
+               @bind="importUrl"
+               @bind:event="oninput" />
+        <span class="form-hint">
+            Enter the URL from the FHIR core build site. The path must contain
+            "<code>codesystem-</code>" so the resource type can be verified. Any <code>.html</code>
+            or <code>.xml</code> extension will be converted to <code>.json</code> for download
+            automatically.
+        </span>
+        @if (urlValidationError is not null)
+        {
+            <span class="form-error">@urlValidationError</span>
+        }
+    </div>
+
+    <div class="form-group">
+        <label for="destinationFolder">Destination Folder</label>
+        <select id="destinationFolder" class="form-select" @bind="selectedFolder">
+            <option value="">— Select a folder —</option>
+            @foreach (var folder in folders)
+            {
+                <option value="@folder">@folder</option>
+            }
+        </select>
+        <span class="form-hint">
+            Choose the source-of-truth subdirectory where the imported CodeSystem will be stored
+            (e.g. "fhir" or "v2"). The file will be placed in the <code>codeSystems</code> subfolder.
+        </span>
+    </div>
+
+    <div class="form-group">
+        <label for="historyFile">History Bundle</label>
+        <select id="historyFile" class="form-select" @bind="selectedHistoryFile">
+            <option value="">— Create new bundle —</option>
+            @foreach (var hf in historyFiles)
+            {
+                <option value="@hf">@hf</option>
+            }
+        </select>
+        <span class="form-hint">
+            Select the history bundle to append the provenance entry to. If none is selected,
+            a new bundle will be created in the <code>history</code> folder.
+        </span>
+    </div>
+
+    <div class="form-group">
+        <label for="changeComment">Changelog Comment</label>
+        <textarea id="changeComment"
+                  class="form-textarea"
+                  rows="4"
+                  placeholder="Describe why this CodeSystem is being imported..."
+                  @bind="changeComment"
+                  @bind:event="oninput"></textarea>
+        <span class="form-hint">
+            This comment will be included in the changelog entry for the import.
+        </span>
+    </div>
+
+    @if (resultMessage is not null)
+    {
+        <div class="@(resultIsError ? "form-result-error" : "form-result-success")">
+            @resultMessage
+            @if (!resultIsError && importedCodeSystemId is not null)
+            {
+                <span> View: <a href="/CodeSystem-@(importedCodeSystemId).html">@importedCodeSystemId</a></span>
+            }
+        </div>
+    }
+
+    <div class="form-actions">
+        <button class="btn btn-primary" disabled="@(!CanImport || importing)" @onclick="HandleImport">
+            @if (importing)
+            {
+                <span>Importing…</span>
+            }
+            else
+            {
+                <span>Import CodeSystem</span>
+            }
+        </button>
+        <button class="btn btn-cancel" disabled="@importing" @onclick="HandleCancel">
+            Cancel
+        </button>
+    </div>
+</div>
+
+@code {
+    private string importUrl = "";
+    private string selectedFolder = "";
+    private string selectedHistoryFile = "";
+    private string changeComment = "";
+    private IReadOnlyList<string> folders = [];
+    private IReadOnlyList<string> historyFiles = [];
+
+    private string? urlValidationError;
+    private string? resultMessage;
+    private string? importedCodeSystemId;
+    private bool resultIsError;
+    private bool importing;
+
+    protected override void OnInitialized()
+    {
+        folders = ThoFileService.GetContentSubdirectories();
+        if (folders.Contains("fhir", StringComparer.OrdinalIgnoreCase))
+            selectedFolder = "fhir";
+
+        historyFiles = ThoFileService.GetHistoryFiles();
+        if (historyFiles.Count > 0)
+            selectedHistoryFile = historyFiles[0];
+    }
+
+    private bool CanImport
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(importUrl) ||
+                string.IsNullOrWhiteSpace(selectedFolder) ||
+                string.IsNullOrWhiteSpace(changeComment))
+                return false;
+
+            var (_, error) = UtgKit.Core.Services.ImportCodeSystemService.NormalizeUrl(importUrl);
+            urlValidationError = error;
+            return error is null;
+        }
+    }
+
+    private async Task HandleImport()
+    {
+        importing = true;
+        resultMessage = null;
+        importedCodeSystemId = null;
+        StateHasChanged();
+
+        try
+        {
+            var authorName = await JS.InvokeAsync<string?>(
+                "localStorage.getItem", "utgkit-user-name");
+            var custodianName = await JS.InvokeAsync<string?>(
+                "localStorage.getItem", "utgkit-custodian");
+
+            var result = await ImportService.ImportAsync(
+                importUrl,
+                selectedFolder,
+                changeComment,
+                string.IsNullOrEmpty(selectedHistoryFile) ? null : selectedHistoryFile,
+                authorName,
+                custodianName);
+
+            if (result.Success)
+            {
+                importedCodeSystemId = result.CodeSystemId;
+                resultMessage = "Successfully imported CodeSystem.";
+                resultIsError = false;
+            }
+            else
+            {
+                resultMessage = result.ErrorMessage;
+                resultIsError = true;
+            }
+        }
+        catch (Exception ex)
+        {
+            resultMessage = $"Unexpected error: {ex.Message}";
+            resultIsError = true;
+        }
+        finally
+        {
+            importing = false;
+        }
+    }
+
+    private void HandleCancel()
+    {
+        Navigation.NavigateTo("/codesystems");
+    }
+}

@@ -18,11 +18,14 @@
     flex-shrink: 0;
 }
 
-.tho-logo-text {
-    font-size: 1.6rem;
-    font-weight: 700;
-    color: #d50032;
-    letter-spacing: 0.05em;
+.tho-logo-img {
+    height: 2rem;
+    width: auto;
+    display: block;
+}
+
+.tho-title {
+    flex-grow: 1;
 }
 
 .tho-title h1 {
@@ -69,4 +72,105 @@
     color: rgba(255, 255, 255, 0.35);
     pointer-events: none;
     cursor: default;
+}
+
+/* Profile widget — top-right of the logo bar */
+.tho-profile {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    position: relative;
+}
+
+.tho-profile-name {
+    cursor: pointer;
+    font-size: 0.85rem;
+    color: #555;
+    padding: 0.25rem 0.6rem;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    background: #f8f8f8;
+    white-space: nowrap;
+    user-select: none;
+    text-align: right;
+    line-height: 1.3;
+}
+
+.tho-profile-name:hover {
+    background: #eee;
+    border-color: #aaa;
+}
+
+::deep .tho-profile-custodian {
+    display: block;
+    font-size: 0.7rem;
+    color: #888;
+}
+
+.tho-profile-editor {
+    position: absolute;
+    right: 0;
+    top: 100%;
+    margin-top: 0.35rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    background: #fff;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    padding: 0.6rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    z-index: 100;
+    min-width: 220px;
+}
+
+.tho-profile-fields {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+}
+
+.tho-profile-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #555;
+}
+
+.tho-profile-input {
+    font-size: 0.85rem;
+    padding: 0.25rem 0.4rem;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.tho-profile-actions {
+    display: flex;
+    gap: 0.35rem;
+    justify-content: flex-end;
+}
+
+.tho-profile-btn {
+    font-size: 0.8rem;
+    padding: 0.25rem 0.6rem;
+    border: 1px solid #0d6efd;
+    border-radius: 3px;
+    background: #0d6efd;
+    color: #fff;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.tho-profile-btn:hover {
+    background: #0b5ed7;
+}
+
+.tho-profile-btn-cancel {
+    background: #6c757d;
+    border-color: #6c757d;
+}
+
+.tho-profile-btn-cancel:hover {
+    background: #5a6268;
 }

@@ -3,11 +3,28 @@
 <header class="tho-header">
     <div class="tho-logo-bar">
         <a href="http://hl7.org/" target="_blank" rel="noopener noreferrer" class="tho-logo-link">
-            <span class="tho-logo-text">HL7<sup>®</sup></span>
+            <img src="/images/hl7-logo-header.png" alt="HL7®" class="tho-logo-img" />
         </a>
         <div class="tho-title">
             <h1>HL7 Terminology (THO)</h1>
             <span class="tho-version">Local Simulation &mdash; UTG Kit</span>
+        </div>
+        <div id="tho-profile" class="tho-profile">
+            <span id="tho-profile-display" class="tho-profile-name" title="Click to edit profile" onclick="document.getElementById('tho-profile-editor').style.display='flex'; document.getElementById('tho-profile-input').value=localStorage.getItem('utgkit-user-name')||''; document.getElementById('tho-custodian-input').value=localStorage.getItem('utgkit-custodian')||''; document.getElementById('tho-profile-input').focus();"></span>
+            <div id="tho-profile-editor" class="tho-profile-editor" style="display:none;">
+                <div class="tho-profile-fields">
+                    <label class="tho-profile-label" for="tho-profile-input">Name</label>
+                    <input id="tho-profile-input" type="text" class="tho-profile-input" placeholder="Enter your name" maxlength="100"
+                           onkeydown="if(event.key==='Enter'){document.getElementById('tho-profile-save').click();}if(event.key==='Escape'){document.getElementById('tho-profile-editor').style.display='none';}" />
+                    <label class="tho-profile-label" for="tho-custodian-input">Custodian</label>
+                    <input id="tho-custodian-input" type="text" class="tho-profile-input" placeholder="e.g. TSMG, Patient Administration WG" maxlength="100"
+                           onkeydown="if(event.key==='Enter'){document.getElementById('tho-profile-save').click();}if(event.key==='Escape'){document.getElementById('tho-profile-editor').style.display='none';}" />
+                </div>
+                <div class="tho-profile-actions">
+                    <button id="tho-profile-save" class="tho-profile-btn" type="button" onclick="var n=document.getElementById('tho-profile-input').value.trim();var c=document.getElementById('tho-custodian-input').value.trim();if(n){localStorage.setItem('utgkit-user-name',n);}else{localStorage.removeItem('utgkit-user-name');}if(c){localStorage.setItem('utgkit-custodian',c);}else{localStorage.removeItem('utgkit-custodian');}window.__utgkitUpdateProfileDisplay();document.getElementById('tho-profile-editor').style.display='none';">Save</button>
+                    <button class="tho-profile-btn tho-profile-btn-cancel" type="button" onclick="document.getElementById('tho-profile-editor').style.display='none';">Cancel</button>
+                </div>
+            </div>
         </div>
     </div>
     <nav class="tho-nav">
@@ -21,3 +38,29 @@
         <NavLink href="/downloads" class="disabled" @onclick:preventDefault>Downloads</NavLink>
     </nav>
 </header>
+
+<script>
+    (function () {
+        window.__utgkitUpdateProfileDisplay = function () {
+            var name = localStorage.getItem('utgkit-user-name');
+            var custodian = localStorage.getItem('utgkit-custodian');
+            var el = document.getElementById('tho-profile-display');
+            if (!el) return;
+            if (!name && !custodian) { el.textContent = 'Set Name'; return; }
+            var html = '';
+            if (name) html += name;
+            if (custodian) html += '<span class="tho-profile-custodian">' + custodian + '</span>';
+            el.innerHTML = html;
+        };
+        window.__utgkitUpdateProfileDisplay();
+        // Re-apply after Blazor enhanced navigation replaces DOM content
+        function registerEnhancedLoad() {
+            if (typeof Blazor !== 'undefined' && Blazor.addEventListener) {
+                Blazor.addEventListener('enhancedload', window.__utgkitUpdateProfileDisplay);
+            } else {
+                setTimeout(registerEnhancedLoad, 50);
+            }
+        }
+        registerEnhancedLoad();
+    })();
+</script>

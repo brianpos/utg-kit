@@ -1,0 +1,254 @@
+@page "/valuesets/import"
+@layout UtgKit.Web.Components.Layout.SimulatorLayout
+@rendermode InteractiveServer
+@inject NavigationManager Navigation
+@inject UtgKit.Core.Services.ThoFileService ThoFileService
+@inject UtgKit.Core.Services.ImportValueSetService ImportService
+@inject IJSRuntime JS
+
+<PageTitle>Import ValueSet — HL7 Terminology (THO)</PageTitle>
+
+<nav class="tho-breadcrumb">
+    <a href="/">Home</a> &rsaquo;
+    <a href="/valuesets">Value Sets</a> &rsaquo;
+    <span>Import from FHIR Core Build</span>
+</nav>
+
+<h2>Import ValueSet from FHIR Core Build</h2>
+
+<div class="import-description">
+    <p>
+        Use this page to import a ValueSet resource from the
+        <a href="https://build.fhir.org" target="_blank">FHIR core build</a> into your local THO repository.
+        The resource will be downloaded from the URL you provide, converted to the THO format,
+        and placed in the appropriate directory within the repository.
+    </p>
+    <p>
+        A changelog entry will be created using the comment you supply below. This comment should
+        describe why the ValueSet is being imported and any relevant context for other contributors.
+    </p>
+</div>
+
+<div class="import-form">
+    <div class="form-group">
+        <label for="importUrl">ValueSet URL</label>
+        <input id="importUrl"
+               type="url"
+               class="form-input"
+               placeholder="https://build.fhir.org/valueset-action-type.html"
+               @bind="importUrl"
+               @bind:event="oninput" />
+        <span class="form-hint">
+            Enter the URL from the FHIR core build site. The path must contain
+            "<code>valueset-</code>" so the resource type can be verified. Any <code>.html</code>
+            or <code>.xml</code> extension will be converted to <code>.json</code> for download
+            automatically.
+        </span>
+        @if (urlValidationError is not null)
+        {
+            <span class="form-error">@urlValidationError</span>
+        }
+    </div>
+
+    <div class="form-group">
+        <label for="destinationFolder">Destination Folder</label>
+        <select id="destinationFolder" class="form-select" @bind="selectedFolder">
+            <option value="">— Select a folder —</option>
+            @foreach (var folder in folders)
+            {
+                <option value="@folder">@folder</option>
+            }
+        </select>
+        <span class="form-hint">
+            Choose the source-of-truth subdirectory where the imported ValueSet will be stored
+            (e.g. "fhir" or "v2"). The file will be placed in the <code>valueSets</code> subfolder.
+        </span>
+    </div>
+
+    <div class="form-group">
+        <label for="historyFile">History Bundle</label>
+        <select id="historyFile" class="form-select" @bind="selectedHistoryFile">
+            <option value="">— Create new bundle —</option>
+            @foreach (var hf in historyFiles)
+            {
+                <option value="@hf">@hf</option>
+            }
+        </select>
+        <span class="form-hint">
+            Select the history bundle to append the provenance entry to. If none is selected,
+            a new bundle will be created in the <code>history</code> folder.
+        </span>
+    </div>
+
+    <div class="form-group">
+        <label for="changeComment">Changelog Comment</label>
+        <textarea id="changeComment"
+                  class="form-textarea"
+                  rows="4"
+                  placeholder="Describe why this ValueSet is being imported..."
+                  @bind="changeComment"
+                  @bind:event="oninput"></textarea>
+        <span class="form-hint">
+            This comment will be included in the changelog entry for the import.
+        </span>
+    </div>
+
+    <div class="form-group form-checkbox-group">
+        <label>
+            <input type="checkbox" @bind="importReferencedCodeSystems" />
+            Also import referenced CodeSystem(s)
+        </label>
+        <span class="form-hint">
+            When checked, the importer will attempt to download and save any CodeSystems referenced
+            in the ValueSet's <code>compose.include</code> elements from the FHIR core build.
+            CodeSystems that already exist in the repository will be skipped.
+        </span>
+    </div>
+
+    @if (resultMessage is not null)
+    {
+        <div class="@(resultIsError ? "form-result-error" : "form-result-success")">
+            @resultMessage
+            @if (!resultIsError && importedValueSetId is not null)
+            {
+                <span> View: <a href="/ValueSet-@(importedValueSetId).html">@importedValueSetId</a></span>
+            }
+        </div>
+    }
+
+    @if (codeSystemResults.Count > 0)
+    {
+        <div class="cs-results">
+            <h4>Referenced CodeSystem Import Results</h4>
+            <ul>
+                @foreach (var csResult in codeSystemResults)
+                {
+                    <li class="@(csResult.Success ? "cs-result-success" : "cs-result-error")">
+                        @if (csResult.Success)
+                        {
+                            <span>✓ @csResult.CodeSystemId</span>
+                            <a href="/CodeSystem-@(csResult.CodeSystemId).html">View</a>
+                        }
+                        else
+                        {
+                            <span>✗ @(csResult.CodeSystemId ?? "Unknown"): @csResult.ErrorMessage</span>
+                        }
+                    </li>
+                }
+            </ul>
+        </div>
+    }
+
+    <div class="form-actions">
+        <button class="btn btn-primary" disabled="@(!CanImport || importing)" @onclick="HandleImport">
+            @if (importing)
+            {
+                <span>Importing…</span>
+            }
+            else
+            {
+                <span>Import ValueSet</span>
+            }
+        </button>
+        <button class="btn btn-cancel" disabled="@importing" @onclick="HandleCancel">
+            Cancel
+        </button>
+    </div>
+</div>
+
+@code {
+    private string importUrl = "";
+    private string selectedFolder = "";
+    private string selectedHistoryFile = "";
+    private string changeComment = "";
+    private bool importReferencedCodeSystems;
+    private IReadOnlyList<string> folders = [];
+    private IReadOnlyList<string> historyFiles = [];
+
+    private string? urlValidationError;
+    private string? resultMessage;
+    private string? importedValueSetId;
+    private bool resultIsError;
+    private bool importing;
+    private IReadOnlyList<UtgKit.Core.Services.ImportCodeSystemResult> codeSystemResults = [];
+
+    protected override void OnInitialized()
+    {
+        folders = ThoFileService.GetContentSubdirectories();
+        if (folders.Contains("fhir", StringComparer.OrdinalIgnoreCase))
+            selectedFolder = "fhir";
+
+        historyFiles = ThoFileService.GetHistoryFiles();
+        if (historyFiles.Count > 0)
+            selectedHistoryFile = historyFiles[0];
+    }
+
+    private bool CanImport
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(importUrl) ||
+                string.IsNullOrWhiteSpace(selectedFolder) ||
+                string.IsNullOrWhiteSpace(changeComment))
+                return false;
+
+            var (_, error) = UtgKit.Core.Services.ImportValueSetService.NormalizeUrl(importUrl);
+            urlValidationError = error;
+            return error is null;
+        }
+    }
+
+    private async Task HandleImport()
+    {
+        importing = true;
+        resultMessage = null;
+        importedValueSetId = null;
+        codeSystemResults = [];
+        StateHasChanged();
+
+        try
+        {
+            var authorName = await JS.InvokeAsync<string?>(
+                "localStorage.getItem", "utgkit-user-name");
+            var custodianName = await JS.InvokeAsync<string?>(
+                "localStorage.getItem", "utgkit-custodian");
+
+            var result = await ImportService.ImportAsync(
+                importUrl,
+                selectedFolder,
+                changeComment,
+                string.IsNullOrEmpty(selectedHistoryFile) ? null : selectedHistoryFile,
+                authorName,
+                custodianName,
+                importReferencedCodeSystems);
+
+            codeSystemResults = result.CodeSystemResults;
+
+            if (result.Success)
+            {
+                importedValueSetId = result.ValueSetId;
+                resultMessage = "Successfully imported ValueSet.";
+                resultIsError = false;
+            }
+            else
+            {
+                resultMessage = result.ErrorMessage;
+                resultIsError = true;
+            }
+        }
+        catch (Exception ex)
+        {
+            resultMessage = $"Unexpected error: {ex.Message}";
+            resultIsError = true;
+        }
+        finally
+        {
+            importing = false;
+        }
+    }
+
+    private void HandleCancel()
+    {
+        Navigation.NavigateTo("/valuesets");
+    }
+}

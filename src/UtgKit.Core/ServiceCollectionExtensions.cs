@@ -14,6 +14,8 @@ public static class ServiceCollectionExtensions
     {
         services.Configure<ThoRepoSettings>(configuration.GetSection(ThoRepoSettings.SectionName));
         services.AddSingleton<ThoFileService>();
+        services.AddHttpClient<ImportCodeSystemService>();
+        services.AddHttpClient<ImportValueSetService>();
         return services;
     }
 }

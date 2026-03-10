@@ -149,6 +149,75 @@ public class ThoFileService
     }
 
     /// <summary>
+    /// Returns the top-level content subdirectory names within the THO repository
+    /// (e.g. "fhir", "v2"), excluding infrastructure directories like "history"
+    /// and "control-manifests".
+    /// </summary>
+    public IReadOnlyList<string> GetContentSubdirectories()
+    {
+        if (string.IsNullOrWhiteSpace(_settings.Path))
+            return [];
+
+        var root = new DirectoryInfo(_settings.Path);
+        if (!root.Exists)
+            return [];
+
+        var excluded = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "history",
+            "control-manifests"
+        };
+
+        return root.EnumerateDirectories()
+            .Where(d => !excluded.Contains(d.Name))
+            .Select(d => d.Name)
+            .OrderBy(n => n, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    /// <summary>
+    /// Returns the file names of history bundles in the history directory,
+    /// sorted so the highest version number appears first.
+    /// </summary>
+    public IReadOnlyList<string> GetHistoryFiles()
+    {
+        if (string.IsNullOrWhiteSpace(_settings.Path))
+            return [];
+
+        var historyDir = new DirectoryInfo(Path.Combine(_settings.Path, "history"));
+        if (!historyDir.Exists)
+            return [];
+
+        return historyDir.EnumerateFiles("*.json")
+            .Select(f => f.Name)
+            .OrderByDescending(n => n, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    /// <summary>
+    /// Returns the full path to the rendering manifest for a content subdirectory
+    /// (e.g. "fhir" → control-manifests/fhir-Rendering.xml), or null if not found.
+    /// </summary>
+    public string? GetRenderingManifestPath(string contentSubdirectory)
+    {
+        if (string.IsNullOrWhiteSpace(_settings.Path))
+            return null;
+
+        var manifestDir = Path.Combine(_settings.Path, "control-manifests");
+        var pattern = $"{contentSubdirectory}-Rendering.xml";
+
+        // Case-insensitive search
+        var dir = new DirectoryInfo(manifestDir);
+        if (!dir.Exists)
+            return null;
+
+        var match = dir.EnumerateFiles("*-Rendering.xml")
+            .FirstOrDefault(f => f.Name.Equals(pattern, StringComparison.OrdinalIgnoreCase));
+
+        return match?.FullName;
+    }
+
+    /// <summary>
     /// Serializes a FHIR resource to pretty-printed XML.
     /// </summary>
     public string SerializeToXml(Resource resource) => _xmlSerializer.SerializeToString(resource);
@@ -220,8 +289,8 @@ public class ThoFileService
                     conceptMaps[cm.Id] = new ConceptMapIndexEntry(
                         file, cm.Id, cm.Url, cm.Version, cm.Name, cm.Title,
                         cm.Status, cm.Description, GetOwner(cm), cm.Date,
-                        (cm.Source as FhirUri)?.Value ?? (cm.Source as Canonical)?.Value,
-                        (cm.Target as FhirUri)?.Value ?? (cm.Target as Canonical)?.Value);
+                        (cm.SourceScope as FhirUri)?.Value ?? (cm.SourceScope as Canonical)?.Value,
+                        (cm.TargetScope as FhirUri)?.Value ?? (cm.TargetScope as Canonical)?.Value);
                     break;
 
                 case Bundle b:
@@ -258,9 +327,15 @@ public class ThoFileService
             var dateStr = prov.Recorded?.ToString("yyyy-MM-dd");
             var activityCode = prov.Activity?.Coding?.FirstOrDefault()?.Code;
             var activityDisplay = prov.Activity?.Coding?.FirstOrDefault()?.Display;
-            var author = prov.Agent?.FirstOrDefault()?.Who?.Display;
-            var authorizingGroup = prov.Agent?.FirstOrDefault()?.OnBehalfOf?.Display;
-            var detail = prov.Reason?.FirstOrDefault()?.Text;
+            var authorAgent = prov.Agent?.FirstOrDefault(a =>
+                a.Type?.Coding?.Any(c => c.Code == "author") == true) ?? prov.Agent?.FirstOrDefault();
+            var custodianAgent = prov.Agent?.FirstOrDefault(a =>
+                a.Type?.Coding?.Any(c => c.Code == "custodian") == true);
+
+            var author = authorAgent?.Who?.Display;
+            var authorizingGroup = custodianAgent?.Who?.Display
+                ?? authorAgent?.OnBehalfOf?.Display;
+            var detail = prov.Authorization?.FirstOrDefault()?.Concept?.Text;
 
             var historyEntry = new HistoryEntry(
                 bundle.Id,
