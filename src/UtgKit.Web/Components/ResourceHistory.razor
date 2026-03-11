@@ -1,4 +1,5 @@
 @inject UtgKit.Core.Services.ThoFileService ThoFileService
+@inject IJSRuntime JS
 
 @if (entries.Count > 0)
 {
@@ -32,15 +33,144 @@
         </tbody>
     </table>
 }
+else
+{
+    <h3>History</h3>
+    <p>No history records found for this resource.</p>
+}
+
+<button class="btn-add-history" @onclick="OpenDialog">Add History Record</button>
+
+@if (showDialog)
+{
+    <div class="history-dialog-backdrop" @onclick="CloseDialog">
+        <div class="history-dialog" @onclick:stopPropagation="true">
+            <h3>Add History Record</h3>
+            <p class="history-dialog-ref">@ResourceReference</p>
+
+            <div class="history-form-group">
+                <label for="hx-activity">Activity</label>
+                <select id="hx-activity" @bind="activityCode">
+                    <option value="UPDATE">revise</option>
+                    <option value="CREATE">create</option>
+                    <option value="APPEND">append</option>
+                    <option value="DELETE">delete</option>
+                    <option value="NULLIFY">nullify</option>
+                </select>
+            </div>
+
+            <div class="history-form-group">
+                <label for="hx-history-file">History Bundle</label>
+                <select id="hx-history-file" @bind="selectedHistoryFile">
+                    <option value="">— Create new bundle —</option>
+                    @foreach (var hf in historyFiles)
+                    {
+                        <option value="@hf">@hf</option>
+                    }
+                </select>
+            </div>
+
+            <div class="history-form-group">
+                <label for="hx-comment">Comment</label>
+                <textarea id="hx-comment" rows="3" placeholder="Describe the change…"
+                          @bind="changeComment" @bind:event="oninput"></textarea>
+            </div>
+
+            @if (resultMessage is not null)
+            {
+                <div class="@(resultIsError ? "history-result-error" : "history-result-success")">
+                    @resultMessage
+                </div>
+            }
+
+            <div class="history-dialog-actions">
+                <button class="btn btn-primary" disabled="@(!CanSubmit || submitting)" @onclick="HandleSubmit">
+                    @(submitting ? "Saving…" : "Save")
+                </button>
+                <button class="btn btn-cancel" disabled="@submitting" @onclick="CloseDialog">Cancel</button>
+            </div>
+        </div>
+    </div>
+}
 
 @code {
     [Parameter, EditorRequired]
     public string ResourceReference { get; set; } = default!;
 
     private IReadOnlyList<UtgKit.Core.Services.HistoryEntry> entries = [];
+    private IReadOnlyList<string> historyFiles = [];
+
+    private bool showDialog;
+    private string activityCode = "UPDATE";
+    private string selectedHistoryFile = "";
+    private string changeComment = "";
+    private string? resultMessage;
+    private bool resultIsError;
+    private bool submitting;
 
     protected override void OnParametersSet()
     {
         entries = ThoFileService.GetResourceHistory(ResourceReference);
+    }
+
+    private bool CanSubmit => !string.IsNullOrWhiteSpace(changeComment);
+
+    private void OpenDialog()
+    {
+        showDialog = true;
+        activityCode = "UPDATE";
+        changeComment = "";
+        selectedHistoryFile = "";
+        resultMessage = null;
+        resultIsError = false;
+
+        historyFiles = ThoFileService.GetHistoryFiles();
+        if (historyFiles.Count > 0)
+            selectedHistoryFile = historyFiles[0];
+    }
+
+    private void CloseDialog()
+    {
+        showDialog = false;
+    }
+
+    private async Task HandleSubmit()
+    {
+        submitting = true;
+        resultMessage = null;
+        StateHasChanged();
+
+        try
+        {
+            var authorName = await JS.InvokeAsync<string?>(
+                "localStorage.getItem", "utgkit-user-name");
+            var custodianName = await JS.InvokeAsync<string?>(
+                "localStorage.getItem", "utgkit-custodian");
+
+            ThoFileService.AppendProvenanceEntry(
+                ResourceReference,
+                activityCode,
+                changeComment,
+                string.IsNullOrEmpty(selectedHistoryFile) ? null : selectedHistoryFile,
+                authorName,
+                custodianName);
+
+            entries = ThoFileService.GetResourceHistory(ResourceReference);
+            resultMessage = "History record added.";
+            resultIsError = false;
+
+            // Auto-close after a short delay
+            await Task.Delay(800);
+            showDialog = false;
+        }
+        catch (Exception ex)
+        {
+            resultMessage = $"Error: {ex.Message}";
+            resultIsError = true;
+        }
+        finally
+        {
+            submitting = false;
+        }
     }
 }

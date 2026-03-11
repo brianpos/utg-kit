@@ -28,7 +28,6 @@ public class ImportValueSetService
     private readonly ImportCodeSystemService _importCodeSystemService;
     private readonly HttpClient _httpClient;
     private readonly FhirJsonParser _jsonParser = new();
-    private readonly FhirJsonSerializer _jsonSerializer = new(new SerializerSettings { Pretty = true });
     private readonly FhirXmlSerializer _xmlSerializer = new(new SerializerSettings { Pretty = true });
     private readonly ILogger<ImportValueSetService> _logger;
 
@@ -354,7 +353,13 @@ public class ImportValueSetService
         AppendToRenderingManifest(destinationFolder, valueSet.Id);
 
         // 7. Append provenance to history bundle
-        AppendProvenanceToHistory(historyFile, valueSet.Id, changeComment, authorName, custodianName);
+        _thoFileService.AppendProvenanceEntry(
+            $"ValueSet/{valueSet.Id}",
+            "CREATE",
+            changeComment,
+            historyFile,
+            authorName,
+            custodianName);
 
         // 8. Invalidate the index so the new resource is picked up
         _thoFileService.InvalidateIndex();
@@ -409,140 +414,4 @@ public class ImportValueSetService
         }
     }
 
-    private void AppendProvenanceToHistory(
-        string? historyFile,
-        string valueSetId,
-        string changeComment,
-        string? authorName,
-        string? custodianName)
-    {
-        string historyPath;
-
-        if (!string.IsNullOrEmpty(historyFile))
-        {
-            historyPath = Path.Combine(_settings.Path, "history", historyFile);
-            if (!File.Exists(historyPath))
-            {
-                _logger.LogWarning("History file not found: {Path}", historyPath);
-                return;
-            }
-        }
-        else
-        {
-            var historyDir = Path.Combine(_settings.Path, "history");
-            Directory.CreateDirectory(historyDir);
-
-            var timestamp = DateTime.UtcNow.ToString("yyyyMMdd-HHmmss");
-            var newFileName = $"utgrel-import-{timestamp}.json";
-            historyPath = Path.Combine(historyDir, newFileName);
-
-            var newBundle = new Bundle
-            {
-                Id = $"hx-import-{timestamp}",
-                Type = Bundle.BundleType.Collection,
-                Entry = []
-            };
-
-            var bundleJson = _jsonSerializer.SerializeToString(newBundle);
-            File.WriteAllText(historyPath, bundleJson);
-            _logger.LogInformation("Created new history bundle: {Path}", historyPath);
-        }
-
-        try
-        {
-            var content = File.ReadAllText(historyPath);
-            var bundle = new FhirJsonParser().Parse<Bundle>(content);
-
-            var now = DateTimeOffset.UtcNow;
-            var provenanceId = $"hx-import-{valueSetId}-{now:yyyyMMdd}";
-
-            var provenance = new Provenance
-            {
-                Id = provenanceId,
-                Target = [new ResourceReference($"ValueSet/{valueSetId}")],
-                Occurred = new Period
-                {
-                    EndElement = new FhirDateTime(now)
-                },
-                Recorded = now,
-                Authorization =
-                [
-                    new CodeableReference
-                    {
-                        Concept = new CodeableConcept
-                        {
-                            Coding =
-                            [
-                                new Coding
-                                {
-                                    System = "http://terminology.hl7.org/CodeSystem/v3-ActReason",
-                                    Code = "METAMGT"
-                                }
-                            ],
-                            Text = changeComment
-                        }
-                    }
-                ],
-                Activity = new CodeableConcept
-                {
-                    Coding =
-                    [
-                        new Coding
-                        {
-                            System = "http://terminology.hl7.org/CodeSystem/v3-DataOperation",
-                            Code = "CREATE"
-                        }
-                    ]
-                },
-                Agent =
-                [
-                    new Provenance.AgentComponent
-                    {
-                        Type = new CodeableConcept
-                        {
-                            Coding =
-                            [
-                                new Coding
-                                {
-                                    System = "http://terminology.hl7.org/CodeSystem/provenance-participant-type",
-                                    Code = "author"
-                                }
-                            ]
-                        },
-                        Who = new ResourceReference { Display = authorName ?? "Unknown" }
-                    },
-                    new Provenance.AgentComponent
-                    {
-                        Type = new CodeableConcept
-                        {
-                            Coding =
-                            [
-                                new Coding
-                                {
-                                    System = "http://terminology.hl7.org/CodeSystem/provenance-participant-type",
-                                    Code = "custodian"
-                                }
-                            ]
-                        },
-                        Who = new ResourceReference { Display = custodianName ?? "TSMG" }
-                    }
-                ]
-            };
-
-            bundle.Entry ??= [];
-            bundle.Entry.Add(new Bundle.EntryComponent
-            {
-                FullUrl = $"http://terminology.hl7.org/fhir/Provenance/{provenanceId}",
-                Resource = provenance
-            });
-
-            var bundleJson = _jsonSerializer.SerializeToString(bundle);
-            File.WriteAllText(historyPath, bundleJson);
-            _logger.LogInformation("Appended provenance {Id} to history bundle {Path}", provenanceId, historyPath);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Failed to update history bundle at {Path}", historyPath);
-        }
     }
-}

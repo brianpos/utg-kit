@@ -319,6 +319,168 @@ public class ThoFileService
         return entries.OrderByDescending(e => e.Date).ToList();
     }
 
+    /// <summary>
+    /// Appends a Provenance entry to a history bundle for the given resource reference.
+    /// If <paramref name="historyFile"/> is null or empty, a new bundle is created.
+    /// After appending, the in-memory history index is updated and <see cref="IndexChanged"/> is raised.
+    /// </summary>
+    public void AppendProvenanceEntry(
+        string resourceReference,
+        string activityCode,
+        string changeComment,
+        string? historyFile,
+        string? authorName,
+        string? custodianName)
+    {
+        if (string.IsNullOrWhiteSpace(_settings.Path))
+            throw new InvalidOperationException("THO repo path is not configured.");
+
+        string historyPath;
+
+        if (!string.IsNullOrEmpty(historyFile))
+        {
+            historyPath = Path.Combine(_settings.Path, "history", historyFile);
+            if (!File.Exists(historyPath))
+            {
+                _logger.LogWarning("History file not found: {Path}", historyPath);
+                return;
+            }
+        }
+        else
+        {
+            var historyDir = Path.Combine(_settings.Path, "history");
+            Directory.CreateDirectory(historyDir);
+
+            var timestamp = DateTime.UtcNow.ToString("yyyyMMdd-HHmmss");
+            var newFileName = $"utgrel-history-{timestamp}.json";
+            historyPath = Path.Combine(historyDir, newFileName);
+
+            var newBundle = new Bundle
+            {
+                Id = $"hx-history-{timestamp}",
+                Type = Bundle.BundleType.Collection,
+                Entry = []
+            };
+
+            var json = _jsonSerializer.SerializeToString(newBundle);
+            File.WriteAllText(historyPath, json);
+            _logger.LogInformation("Created new history bundle: {Path}", historyPath);
+        }
+
+        try
+        {
+            var content = File.ReadAllText(historyPath);
+            var bundle = _jsonParser.Parse<Bundle>(content);
+
+            var now = DateTimeOffset.UtcNow;
+            // Extract resource id from reference (e.g. "CodeSystem/action-type" -> "action-type")
+            var resourceId = resourceReference.Contains('/')
+                ? resourceReference[(resourceReference.IndexOf('/') + 1)..]
+                : resourceReference;
+            var provenanceId = $"hx-{resourceId}-{now:yyyyMMdd}";
+
+            var provenance = new Provenance
+            {
+                Id = provenanceId,
+                Target = [new ResourceReference(resourceReference)],
+                Occurred = new Period
+                {
+                    EndElement = new FhirDateTime(now)
+                },
+                Recorded = now,
+                Authorization =
+                [
+                    new CodeableReference
+                    {
+                        Concept = new CodeableConcept
+                        {
+                            Coding =
+                            [
+                                new Coding
+                                {
+                                    System = "http://terminology.hl7.org/CodeSystem/v3-ActReason",
+                                    Code = "METAMGT"
+                                }
+                            ],
+                            Text = changeComment
+                        }
+                    }
+                ],
+                Activity = new CodeableConcept
+                {
+                    Coding =
+                    [
+                        new Coding
+                        {
+                            System = "http://terminology.hl7.org/CodeSystem/v3-DataOperation",
+                            Code = activityCode
+                        }
+                    ]
+                },
+                Agent =
+                [
+                    new Provenance.AgentComponent
+                    {
+                        Type = new CodeableConcept
+                        {
+                            Coding =
+                            [
+                                new Coding
+                                {
+                                    System = "http://terminology.hl7.org/CodeSystem/provenance-participant-type",
+                                    Code = "author"
+                                }
+                            ]
+                        },
+                        Who = new ResourceReference { Display = authorName ?? "Unknown" }
+                    },
+                    new Provenance.AgentComponent
+                    {
+                        Type = new CodeableConcept
+                        {
+                            Coding =
+                            [
+                                new Coding
+                                {
+                                    System = "http://terminology.hl7.org/CodeSystem/provenance-participant-type",
+                                    Code = "custodian"
+                                }
+                            ]
+                        },
+                        Who = new ResourceReference { Display = custodianName ?? "TSMG" }
+                    }
+                ]
+            };
+
+            bundle.Entry ??= [];
+            bundle.Entry.Add(new Bundle.EntryComponent
+            {
+                FullUrl = $"http://terminology.hl7.org/fhir/Provenance/{provenanceId}",
+                Resource = provenance
+            });
+
+            var updatedJson = _jsonSerializer.SerializeToString(bundle);
+            File.WriteAllText(historyPath, updatedJson);
+            _logger.LogInformation("Appended provenance {Id} to history bundle {Path}", provenanceId, historyPath);
+
+            // Update the in-memory index with only the new entry (not the whole bundle,
+            // which would re-add already-indexed entries as duplicates).
+            var index = EnsureIndex();
+            var singleEntryBundle = new Bundle
+            {
+                Id = bundle.Id,
+                Entry = [bundle.Entry[^1]]
+            };
+            ExtractHistoryFromBundle(singleEntryBundle, index.History);
+            IndexChanged?.Invoke();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to update history bundle at {Path}", historyPath);
+            throw;
+        }
+    }
+
     #endregion
 
     /// <summary>
@@ -493,7 +655,20 @@ public class ThoFileService
         removed |= RemoveByPath(index.CodeSystems, filePath);
         removed |= RemoveByPath(index.ValueSets, filePath);
         removed |= RemoveByPath(index.ConceptMaps, filePath);
-        removed |= RemoveByPath(index.Bundles, filePath);
+
+        // When removing a Bundle, also clear its history entries so that
+        // a subsequent re-index (via AddToIndex → ExtractHistoryFromBundle)
+        // doesn't duplicate them.
+        var bundleKey = index.Bundles
+            .FirstOrDefault(kv => string.Equals(kv.Value.FilePath, filePath, StringComparison.OrdinalIgnoreCase)).Key;
+        if (bundleKey is not null)
+        {
+            index.Bundles.Remove(bundleKey);
+            foreach (var list in index.History.Values)
+                list.RemoveAll(h => string.Equals(h.BundleId, bundleKey, StringComparison.OrdinalIgnoreCase));
+            removed = true;
+        }
+
         removed |= RemoveByPath(index.Lists, filePath);
         removed |= RemoveByPath(index.Provenances, filePath);
         return removed;
