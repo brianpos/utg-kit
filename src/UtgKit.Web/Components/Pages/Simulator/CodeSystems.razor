@@ -32,6 +32,15 @@ else if (allItems.Count == 0)
 }
 else
 {
+    <div class="tho-tab-bar">
+        <button class="tho-tab @(activeGroup is null ? "active" : "")" @onclick="() => SetGroup(null)">All</button>
+        @foreach (var group in manifestGroups)
+        {
+            <button class="tho-tab @(activeGroup == group ? "active" : "")" @onclick="() => SetGroup(group)">@group</button>
+        }
+        <button class="tho-tab @(activeGroup == UnallocatedGroup ? "active" : "")" @onclick="() => SetGroup(UnallocatedGroup)">Un-allocated</button>
+    </div>
+
     <p><strong>@filtered.Count</strong> of @allItems.Count code systems shown.</p>
     <table class="tho-list-table">
         <thead>
@@ -75,9 +84,13 @@ else
 }
 
 @code {
+    private const string UnallocatedGroup = "__unallocated__";
+
     private IReadOnlyList<UtgKit.Core.Services.CodeSystemIndexEntry>? allItems;
     private List<UtgKit.Core.Services.CodeSystemIndexEntry> filtered = [];
     private UtgKit.Core.Services.IndexingProgress? loadingProgress;
+    private IReadOnlyList<string> manifestGroups = [];
+    private string? activeGroup;
 
     private string filterIdentity = "", filterName = "", filterVersion = "", filterStatus = "";
     private string filterContent = "", filterOwner = "", filterDate = "", filterDescription = "";
@@ -90,6 +103,7 @@ else
         ThoFileService.IndexingProgressChanged += OnProgressChanged;
 
         allItems = await ThoFileService.GetCodeSystemIndexAsync();
+        manifestGroups = ThoFileService.GetManifestGroups();
         ApplyFilter();
     }
 
@@ -116,6 +130,12 @@ else
         ApplyFilter();
     }
 
+    private void SetGroup(string? group)
+    {
+        activeGroup = group;
+        ApplyFilter();
+    }
+
     private MarkupString SortIndicator(string column)
         => new(sortColumn == column ? (sortAscending ? "&#9650;" : "&#9660;") : "");
 
@@ -124,6 +144,17 @@ else
         if (allItems is null) return;
 
         var query = allItems.AsEnumerable();
+
+        // Apply manifest group tab filter
+        if (activeGroup == UnallocatedGroup)
+        {
+            query = query.Where(e => ThoFileService.GetManifestGroupsForResource($"CodeSystem/{e.Id}").Count == 0);
+        }
+        else if (activeGroup is not null)
+        {
+            var groupRefs = ThoFileService.GetManifestGroupReferences(activeGroup);
+            query = query.Where(e => groupRefs.Contains($"CodeSystem/{e.Id}"));
+        }
 
         if (!string.IsNullOrEmpty(filterIdentity))
             query = query.Where(e => Contains(e.Id, filterIdentity));

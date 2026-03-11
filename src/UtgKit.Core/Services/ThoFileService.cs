@@ -155,6 +155,133 @@ public class ThoFileService
 
     #endregion
 
+    #region Manifest Groups
+
+    /// <summary>
+    /// Returns all rendering manifest group names (e.g. "fhir", "v2", "v3").
+    /// </summary>
+    public IReadOnlyList<string> GetManifestGroups()
+        => EnsureIndex().ManifestGroups.Keys.OrderBy(k => k, StringComparer.OrdinalIgnoreCase).ToList();
+
+    /// <summary>
+    /// Returns the set of manifest group names that contain the given resource reference
+    /// (e.g. "CodeSystem/action-type" → ["fhir"]).
+    /// </summary>
+    public IReadOnlyList<string> GetManifestGroupsForResource(string resourceReference)
+        => EnsureIndex().ManifestGroupMembers.TryGetValue(resourceReference, out var groups)
+            ? groups.OrderBy(g => g, StringComparer.OrdinalIgnoreCase).ToList()
+            : [];
+
+    /// <summary>
+    /// Returns the set of resource references belonging to a manifest group.
+    /// </summary>
+    public IReadOnlySet<string> GetManifestGroupReferences(string groupName)
+        => EnsureIndex().ManifestGroups.TryGetValue(groupName, out var refs)
+            ? refs
+            : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Adds a resource reference to a rendering manifest group and persists the change.
+    /// </summary>
+    public void AddResourceToManifestGroup(string groupName, string resourceReference, string resourceType)
+    {
+        var manifestPath = GetRenderingManifestPath(groupName);
+        if (manifestPath is null)
+        {
+            _logger.LogWarning("No rendering manifest found for group {Group}", groupName);
+            return;
+        }
+
+        try
+        {
+            var content = File.ReadAllText(manifestPath);
+            var list = _xmlParser.Parse<FhirList>(content);
+
+            var alreadyExists = list.Entry?.Any(e =>
+                e.Item?.Reference == resourceReference) == true;
+
+            if (!alreadyExists)
+            {
+                list.Entry ??= [];
+                list.Entry.Add(new FhirList.EntryComponent
+                {
+                    Item = new ResourceReference
+                    {
+                        Reference = resourceReference,
+                        Type = resourceType
+                    }
+                });
+
+                var xml = _xmlSerializer.SerializeToString(list);
+                File.WriteAllText(manifestPath, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" + xml);
+                _logger.LogInformation("Added {Reference} to manifest group {Group}", resourceReference, groupName);
+
+                // Update the in-memory index
+                var index = EnsureIndex();
+                if (!index.ManifestGroups.TryGetValue(groupName, out var refs))
+                {
+                    refs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    index.ManifestGroups[groupName] = refs;
+                }
+                refs.Add(resourceReference);
+
+                if (!index.ManifestGroupMembers.TryGetValue(resourceReference, out var groups))
+                {
+                    groups = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    index.ManifestGroupMembers[resourceReference] = groups;
+                }
+                groups.Add(groupName);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to add {Reference} to manifest group {Group}", resourceReference, groupName);
+        }
+    }
+
+    /// <summary>
+    /// Removes a resource reference from a rendering manifest group and persists the change.
+    /// </summary>
+    public void RemoveResourceFromManifestGroup(string groupName, string resourceReference)
+    {
+        var manifestPath = GetRenderingManifestPath(groupName);
+        if (manifestPath is null)
+        {
+            _logger.LogWarning("No rendering manifest found for group {Group}", groupName);
+            return;
+        }
+
+        try
+        {
+            var content = File.ReadAllText(manifestPath);
+            var list = _xmlParser.Parse<FhirList>(content);
+
+            var removed = list.Entry?.RemoveAll(e =>
+                string.Equals(e.Item?.Reference, resourceReference, StringComparison.OrdinalIgnoreCase)) ?? 0;
+
+            if (removed > 0)
+            {
+                var xml = _xmlSerializer.SerializeToString(list);
+                File.WriteAllText(manifestPath, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" + xml);
+                _logger.LogInformation("Removed {Reference} from manifest group {Group}", resourceReference, groupName);
+
+                // Update the in-memory index
+                var index = EnsureIndex();
+                if (index.ManifestGroups.TryGetValue(groupName, out var refs))
+                    refs.Remove(resourceReference);
+
+                if (index.ManifestGroupMembers.TryGetValue(resourceReference, out var groups))
+                    groups.Remove(groupName);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to remove {Reference} from manifest group {Group}", resourceReference, groupName);
+        }
+    }
+
+    #endregion
+
     #region Provenance
 
     public IReadOnlyList<ProvenanceIndexEntry> GetProvenanceIndex()
@@ -408,7 +535,62 @@ public class ThoFileService
                 ReportProgress(new IndexingProgress(totalFiles, processedFiles));
         }
 
-        return new ResourceIndex(codeSystems, valueSets, conceptMaps, bundles, lists, provenances, history);
+        // Build manifest group index from rendering manifests
+        var manifestGroups = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+        var manifestGroupMembers = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+        BuildManifestGroupIndex(manifestGroups, manifestGroupMembers);
+
+        return new ResourceIndex(codeSystems, valueSets, conceptMaps, bundles, lists, provenances, history, manifestGroups, manifestGroupMembers);
+    }
+
+    private void BuildManifestGroupIndex(
+        Dictionary<string, HashSet<string>> manifestGroups,
+        Dictionary<string, HashSet<string>> manifestGroupMembers)
+    {
+        if (string.IsNullOrWhiteSpace(_settings.Path))
+            return;
+
+        var manifestDir = new DirectoryInfo(Path.Combine(_settings.Path, "control-manifests"));
+        if (!manifestDir.Exists)
+            return;
+
+        foreach (var file in manifestDir.EnumerateFiles("*-Rendering.xml"))
+        {
+            // Extract group name: "fhir-Rendering.xml" → "fhir"
+            var groupName = file.Name[..file.Name.IndexOf("-Rendering", StringComparison.OrdinalIgnoreCase)];
+            var refs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            try
+            {
+                var content = File.ReadAllText(file.FullName);
+                var list = _xmlParser.Parse<FhirList>(content);
+
+                if (list.Entry is not null)
+                {
+                    foreach (var entry in list.Entry)
+                    {
+                        var reference = entry.Item?.Reference;
+                        if (string.IsNullOrEmpty(reference))
+                            continue;
+
+                        refs.Add(reference);
+
+                        if (!manifestGroupMembers.TryGetValue(reference, out var groups))
+                        {
+                            groups = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                            manifestGroupMembers[reference] = groups;
+                        }
+                        groups.Add(groupName);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "Failed to parse rendering manifest: {Path}", file.FullName);
+            }
+
+            manifestGroups[groupName] = refs;
+        }
     }
 
     private void ReportProgress(IndexingProgress progress)
@@ -531,5 +713,7 @@ public class ThoFileService
         Dictionary<string, BundleIndexEntry> Bundles,
         Dictionary<string, ListIndexEntry> Lists,
         Dictionary<string, ProvenanceIndexEntry> Provenances,
-        Dictionary<string, List<HistoryEntry>> History);
+        Dictionary<string, List<HistoryEntry>> History,
+        Dictionary<string, HashSet<string>> ManifestGroups,
+        Dictionary<string, HashSet<string>> ManifestGroupMembers);
 }

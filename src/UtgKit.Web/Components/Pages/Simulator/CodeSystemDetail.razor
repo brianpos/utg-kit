@@ -67,6 +67,32 @@ else
         </tr>
     </table>
 
+    <div class="tho-manifest-groups">
+        <strong>Manifest groups:</strong>
+        @if (resourceGroups.Count > 0)
+        {
+            @foreach (var group in resourceGroups)
+            {
+                <span class="tho-group-badge">@group<button class="tho-group-remove" @onclick="() => RemoveFromGroup(group)" title="Remove from @group">&times;</button></span>
+            }
+        }
+        else
+        {
+            <span class="tho-group-badge unallocated">Un-allocated</span>
+        }
+        @if (availableGroups.Count > 0)
+        {
+            <select @bind="selectedGroup">
+                <option value="">Add to group…</option>
+                @foreach (var group in availableGroups)
+                {
+                    <option value="@group">@group</option>
+                }
+            </select>
+            <button class="tho-btn-small" @onclick="AddToGroup" disabled="@string.IsNullOrEmpty(selectedGroup)">Add</button>
+        }
+    </div>
+
     @if (!string.IsNullOrEmpty(codeSystem.Copyright))
     {
         <div class="tho-copyright">
@@ -144,6 +170,9 @@ else
     private string? xmlContent;
     private string? jsonContent;
     private IReadOnlyList<UtgKit.Core.Services.ValueSetIndexEntry> referencingValueSets = [];
+    private IReadOnlyList<string> resourceGroups = [];
+    private IReadOnlyList<string> availableGroups = [];
+    private string selectedGroup = "";
 
     private enum Tab { Narrative, Xml, Json }
 
@@ -164,6 +193,30 @@ else
                 ? ThoFileService.GetValueSetsReferencingCodeSystem(codeSystem.Url)
                 : [];
         }
+
+        LoadManifestGroupInfo();
+    }
+
+    private void LoadManifestGroupInfo()
+    {
+        var reference = $"CodeSystem/{Id}";
+        resourceGroups = ThoFileService.GetManifestGroupsForResource(reference);
+        var allGroups = ThoFileService.GetManifestGroups();
+        availableGroups = allGroups.Where(g => !resourceGroups.Contains(g)).ToList();
+    }
+
+    private void AddToGroup()
+    {
+        if (string.IsNullOrEmpty(selectedGroup)) return;
+        ThoFileService.AddResourceToManifestGroup(selectedGroup, $"CodeSystem/{Id}", "CodeSystem");
+        selectedGroup = "";
+        LoadManifestGroupInfo();
+    }
+
+    private void RemoveFromGroup(string group)
+    {
+        ThoFileService.RemoveResourceFromManifestGroup(group, $"CodeSystem/{Id}");
+        LoadManifestGroupInfo();
     }
 
     /// <summary>
