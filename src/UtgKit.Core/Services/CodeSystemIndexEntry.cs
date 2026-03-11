@@ -49,7 +49,8 @@ public sealed record ValueSetIndexEntry(
     PublicationStatus? Status,
     string? Description,
     string? Owner,
-    string? Date)
+    string? Date,
+    IReadOnlyList<string> ReferencedCodeSystemUrls)
     : ResourceIndexEntry(FilePath, Id, Url, Version, Name, Title, Status, Description, Owner, Date);
 
 /// <summary>

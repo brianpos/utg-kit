@@ -41,6 +41,13 @@ public class ThoFileService
     public CodeSystem? LoadCodeSystem(string id)
         => LoadResource<CodeSystem>(GetCodeSystemIndexEntry(id));
 
+    public CodeSystemIndexEntry? GetCodeSystemIndexEntryByUrl(string canonicalUrl)
+        => EnsureIndex().CodeSystems.Values
+            .FirstOrDefault(e => string.Equals(e.Url, canonicalUrl, StringComparison.OrdinalIgnoreCase));
+
+    public CodeSystem? LoadCodeSystemByUrl(string canonicalUrl)
+        => LoadResource<CodeSystem>(GetCodeSystemIndexEntryByUrl(canonicalUrl));
+
     #endregion
 
     #region ValueSet
@@ -55,6 +62,23 @@ public class ThoFileService
 
     public ValueSet? LoadValueSet(string id)
         => LoadResource<ValueSet>(GetValueSetIndexEntry(id));
+
+    public ValueSet? LoadValueSetByUrl(string canonicalUrl)
+    {
+        var entry = EnsureIndex().ValueSets.Values
+            .FirstOrDefault(e => string.Equals(e.Url, canonicalUrl, StringComparison.OrdinalIgnoreCase));
+        return LoadResource<ValueSet>(entry);
+    }
+
+    /// <summary>
+    /// Returns index entries for all ValueSets whose compose includes the given CodeSystem URL.
+    /// </summary>
+    public IReadOnlyList<ValueSetIndexEntry> GetValueSetsReferencingCodeSystem(string codeSystemUrl)
+        => EnsureIndex().ValueSets.Values
+            .Where(e => e.ReferencedCodeSystemUrls
+                .Any(u => string.Equals(u, codeSystemUrl, StringComparison.OrdinalIgnoreCase)))
+            .OrderBy(e => e.Title ?? e.Name ?? e.Id)
+            .ToList();
 
     #endregion
 
@@ -280,9 +304,15 @@ public class ThoFileService
                     break;
 
                 case ValueSet vs:
+                    var referencedSystems = vs.Compose?.Include?
+                        .Select(i => i.System)
+                        .Where(s => !string.IsNullOrEmpty(s))
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .ToList() ?? [];
                     valueSets[vs.Id] = new ValueSetIndexEntry(
                         file, vs.Id, vs.Url, vs.Version, vs.Name, vs.Title,
-                        vs.Status, vs.Description, GetOwner(vs), vs.Date);
+                        vs.Status, vs.Description, GetOwner(vs), vs.Date,
+                        referencedSystems!);
                     break;
 
                 case ConceptMap cm:

@@ -3,6 +3,7 @@
 @rendermode InteractiveServer
 @using Hl7.Fhir.Model
 @inject UtgKit.Core.Services.ThoFileService ThoFileService
+@inject UtgKit.Core.Services.ValueSetExpansionService ExpansionService
 
 <PageTitle>@(valueSet?.Title ?? valueSet?.Name ?? Id) — HL7 Terminology (THO)</PageTitle>
 
@@ -42,6 +43,10 @@ else
 
     <table class="tho-metadata">
         <tr>
+            <td colspan="3"><i>Official URL:</i> <strong>@valueSet.Url</strong></td>
+            <td colspan="1"><i>Version:</i> <strong>@valueSet.Version</strong></td>
+        </tr>
+        <tr>
             @if (valueSet.Status.HasValue)
             {
                 <td><strong>@valueSet.Status</strong> as of @(valueSet.Date ?? "unknown")</td>
@@ -54,11 +59,11 @@ else
             }
             @if (!string.IsNullOrEmpty(valueSet.Publisher))
             {
-                <td>Responsible: @valueSet.Publisher</td>
+                <td><i>Responsible:</i> @valueSet.Publisher</td>
             }
             @if (!string.IsNullOrEmpty(valueSet.Name))
             {
-                <td>Computable Name: @valueSet.Name</td>
+                <td><i>Computable Name:</i> @valueSet.Name</td>
             }
         </tr>
     </table>
@@ -102,7 +107,10 @@ else
     {
         @foreach (var include in valueSet.Compose.Include)
         {
-            <h3>From <code>@include.System</code></h3>
+            <h3>From <code>@if (include.System is not null && codeSystemIds.TryGetValue(include.System, out var csId))
+                    {<a href="/CodeSystem-@(csId).html">@include.System</a>}
+                    else
+                    {@include.System}</code></h3>
 
             @if (include.Concept?.Count > 0)
             {
@@ -143,22 +151,27 @@ else
 
     @if (valueSet.Expansion?.Contains?.Count > 0)
     {
-        <h3>Expansion</h3>
+        <h3>Expansion@(wasExpanded ? " (generated)" : "")</h3>
         <table class="tho-concept-table">
             <thead>
                 <tr>
-                    <th>Code</th>
                     <th>System</th>
+                    <th>Code</th>
                     <th>Display</th>
+                    <th>Definition</th>
                 </tr>
             </thead>
             <tbody>
                 @foreach (var item in valueSet.Expansion.Contains)
                 {
                     <tr>
+                        <td>@if (item.System is not null && codeSystemIds.TryGetValue(item.System, out var expCsId))
+                            {<a href="/CodeSystem-@(expCsId).html">@item.System</a>}
+                            else
+                            {@item.System}</td>
                         <td><code>@item.Code</code></td>
-                        <td>@item.System</td>
                         <td>@item.Display</td>
+                        <td>@GetConceptDefinition(item)</td>
                     </tr>
                 }
             </tbody>
@@ -176,14 +189,28 @@ else
 
     private ValueSet? valueSet;
     private string? fmm;
+    private bool wasExpanded;
     private Tab activeTab = Tab.Narrative;
     private string? xmlContent;
     private string? jsonContent;
+    private Dictionary<string, string> codeSystemIds = new();
+    private Dictionary<string, CodeSystem?> loadedCodeSystems = new(StringComparer.OrdinalIgnoreCase);
 
     private enum Tab { Narrative, Xml, Json }
 
+    private static IEnumerable<string> CollectSystemUrls(ValueSet vs)
+    {
+        if (vs.Compose?.Include is not null)
+            foreach (var inc in vs.Compose.Include)
+                if (inc.System is not null) yield return inc.System;
+        if (vs.Expansion?.Contains is not null)
+            foreach (var c in vs.Expansion.Contains)
+                if (c.System is not null) yield return c.System;
+    }
+
     protected override void OnParametersSet()
     {
+        loadedCodeSystems.Clear();
         valueSet = ThoFileService.LoadValueSet(Id);
 
         fmm = valueSet?.Extension
@@ -192,8 +219,53 @@ else
 
         if (valueSet is not null)
         {
+            // Serialize first so XML/JSON tabs reflect original on-disk content.
             xmlContent = ThoFileService.SerializeToXml(valueSet);
             jsonContent = ThoFileService.SerializeToJson(valueSet);
+
+            // If the ValueSet has no expansion, try to expand it using local CodeSystems.
+            // This only affects the Narrative tab rendering.
+            wasExpanded = valueSet.Expansion?.Contains?.Count is null or 0
+                && ExpansionService.TryExpand(valueSet);
+
+            // Build a lookup of CodeSystem canonical URLs to local IDs for navigation links.
+            codeSystemIds = CollectSystemUrls(valueSet)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Select(url => (url, entry: ThoFileService.GetCodeSystemIndexEntryByUrl(url)))
+                .Where(t => t.entry is not null)
+                .ToDictionary(t => t.url, t => t.entry!.Id, StringComparer.OrdinalIgnoreCase);
         }
+    }
+
+    private string? GetConceptDefinition(ValueSet.ContainsComponent item)
+    {
+        var extDef = item.GetExtensionValue<FhirString>(
+            "http://hl7.org/fhir/StructureDefinition/valueset-concept-definition")?.Value;
+        if (!string.IsNullOrEmpty(extDef))
+            return extDef;
+
+        if (item.System is null || item.Code is null)
+            return null;
+
+        if (!loadedCodeSystems.TryGetValue(item.System, out var cs))
+        {
+            cs = ThoFileService.LoadCodeSystemByUrl(item.System);
+            loadedCodeSystems[item.System] = cs;
+        }
+
+        return cs is not null ? FindDefinition(cs.Concept, item.Code) : null;
+    }
+
+    private static string? FindDefinition(List<CodeSystem.ConceptDefinitionComponent>? concepts, string code)
+    {
+        if (concepts is null) return null;
+        foreach (var c in concepts)
+        {
+            if (string.Equals(c.Code, code, StringComparison.OrdinalIgnoreCase))
+                return c.Definition;
+            var nested = FindDefinition(c.Concept, code);
+            if (nested is not null) return nested;
+        }
+        return null;
     }
 }

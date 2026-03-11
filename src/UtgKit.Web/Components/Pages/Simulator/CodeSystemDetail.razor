@@ -41,7 +41,11 @@ else
     <h2>CodeSystem: @(codeSystem.Title ?? codeSystem.Name)</h2>
 
     <table class="tho-metadata">
-        <tr>
+            <tr>
+                <td colspan="3"><i>Official URL:</i> <strong>@codeSystem.Url</strong></td>
+                <td colspan="1"><i>Version:</i> <strong>@codeSystem.Version</strong></td>
+            </tr>
+            <tr>
             @if (codeSystem.Status.HasValue)
             {
                 <td><strong>@codeSystem.Status</strong> as of @(codeSystem.Date ?? "unknown")</td>
@@ -54,11 +58,11 @@ else
             }
             @if (!string.IsNullOrEmpty(codeSystem.Publisher))
             {
-                <td>Responsible: @codeSystem.Publisher</td>
+                <td><i>Responsible:</i> @codeSystem.Publisher</td>
             }
             @if (!string.IsNullOrEmpty(codeSystem.Name))
             {
-                <td>Computable Name: @codeSystem.Name</td>
+                <td><i>Computable Name:</i> @codeSystem.Name</td>
             }
         </tr>
     </table>
@@ -78,6 +82,17 @@ else
     @if (!string.IsNullOrEmpty(codeSystem.Purpose))
     {
         <p>@codeSystem.Purpose</p>
+    }
+
+    @if (referencingValueSets.Count > 0)
+    {
+        <p>This Code system is referenced in the definition of the following value sets:</p>
+        <ul>
+            @foreach (var vs in referencingValueSets)
+            {
+                <li><a href="/ValueSet-@(vs.Id).html">@(vs.Title ?? vs.Name ?? vs.Id)</a></li>
+            }
+        </ul>
     }
 
     <div class="tho-details">
@@ -128,6 +143,7 @@ else
     private Tab activeTab = Tab.Narrative;
     private string? xmlContent;
     private string? jsonContent;
+    private IReadOnlyList<UtgKit.Core.Services.ValueSetIndexEntry> referencingValueSets = [];
 
     private enum Tab { Narrative, Xml, Json }
 
@@ -144,6 +160,9 @@ else
         {
             xmlContent = ThoFileService.SerializeToXml(codeSystem);
             jsonContent = ThoFileService.SerializeToJson(codeSystem);
+            referencingValueSets = !string.IsNullOrEmpty(codeSystem.Url)
+                ? ThoFileService.GetValueSetsReferencingCodeSystem(codeSystem.Url)
+                : [];
         }
     }
 
