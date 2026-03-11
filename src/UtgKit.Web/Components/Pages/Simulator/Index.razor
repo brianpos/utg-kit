@@ -1,5 +1,8 @@
 @page "/"
 @layout UtgKit.Web.Components.Layout.SimulatorLayout
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@inject UtgKit.Core.Services.ThoFileService ThoFileService
+@implements IDisposable
 
 <PageTitle>HL7 Terminology (THO) — Local Simulation</PageTitle>
 
@@ -9,8 +12,46 @@
     artifacts from your local THO repository clone.
 </p>
 
+@if (loadingProgress is not null && !indexReady)
+{
+    <div class="loading-progress">
+        <p><em>Indexing THO repository…</em></p>
+        <progress max="@loadingProgress.TotalFiles" value="@loadingProgress.ProcessedFiles"></progress>
+        <p>@loadingProgress.ProcessedFiles of @loadingProgress.TotalFiles files processed</p>
+    </div>
+}
+else if (indexReady)
+{
+    <p>✔ Resource index ready.</p>
+}
+
 <h3>Quick Actions</h3>
 <ul>
     <li><a href="/codesystems/import">Import a CodeSystem</a></li>
     <li><a href="/valuesets/import">Import a ValueSet</a></li>
 </ul>
+
+@code {
+    private UtgKit.Core.Services.IndexingProgress? loadingProgress;
+    private bool indexReady;
+
+    protected override async Task OnInitializedAsync()
+    {
+        loadingProgress = ThoFileService.CurrentIndexingProgress;
+        ThoFileService.IndexingProgressChanged += OnProgressChanged;
+
+        await ThoFileService.GetCodeSystemIndexAsync();
+        indexReady = true;
+    }
+
+    private void OnProgressChanged(UtgKit.Core.Services.IndexingProgress progress)
+    {
+        loadingProgress = progress;
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        ThoFileService.IndexingProgressChanged -= OnProgressChanged;
+    }
+}

@@ -1,7 +1,8 @@
 @page "/codesystems"
 @layout UtgKit.Web.Components.Layout.SimulatorLayout
-@rendermode InteractiveServer
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
 @inject UtgKit.Core.Services.ThoFileService ThoFileService
+@implements IDisposable
 
 <PageTitle>Code Systems — HL7 Terminology (THO)</PageTitle>
 
@@ -16,7 +17,14 @@
 
 @if (allItems is null)
 {
-    <p><em>Loading...</em></p>
+    <div class="loading-progress">
+        <p><em>Loading code systems…</em></p>
+        @if (loadingProgress is not null)
+        {
+            <progress max="@loadingProgress.TotalFiles" value="@loadingProgress.ProcessedFiles"></progress>
+            <p>@loadingProgress.ProcessedFiles of @loadingProgress.TotalFiles files processed</p>
+        }
+    </div>
 }
 else if (allItems.Count == 0)
 {
@@ -69,16 +77,31 @@ else
 @code {
     private IReadOnlyList<UtgKit.Core.Services.CodeSystemIndexEntry>? allItems;
     private List<UtgKit.Core.Services.CodeSystemIndexEntry> filtered = [];
+    private UtgKit.Core.Services.IndexingProgress? loadingProgress;
 
     private string filterIdentity = "", filterName = "", filterVersion = "", filterStatus = "";
     private string filterContent = "", filterOwner = "", filterDate = "", filterDescription = "";
     private string sortColumn = "Identity";
     private bool sortAscending = true;
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
-        allItems = ThoFileService.GetCodeSystemIndex();
+        loadingProgress = ThoFileService.CurrentIndexingProgress;
+        ThoFileService.IndexingProgressChanged += OnProgressChanged;
+
+        allItems = await ThoFileService.GetCodeSystemIndexAsync();
         ApplyFilter();
+    }
+
+    private void OnProgressChanged(UtgKit.Core.Services.IndexingProgress progress)
+    {
+        loadingProgress = progress;
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        ThoFileService.IndexingProgressChanged -= OnProgressChanged;
     }
 
     private void Sort(string column)

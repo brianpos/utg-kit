@@ -1,7 +1,8 @@
 @page "/valuesets"
 @layout UtgKit.Web.Components.Layout.SimulatorLayout
-@rendermode InteractiveServer
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
 @inject UtgKit.Core.Services.ThoFileService ThoFileService
+@implements IDisposable
 
 <PageTitle>Value Sets — HL7 Terminology (THO)</PageTitle>
 
@@ -16,7 +17,14 @@
 
 @if (allItems is null)
 {
-    <p><em>Loading...</em></p>
+    <div class="loading-progress">
+        <p><em>Loading value sets…</em></p>
+        @if (loadingProgress is not null)
+        {
+            <progress max="@loadingProgress.TotalFiles" value="@loadingProgress.ProcessedFiles"></progress>
+            <p>@loadingProgress.ProcessedFiles of @loadingProgress.TotalFiles files processed</p>
+        }
+    </div>
 }
 else if (allItems.Count == 0)
 {
@@ -66,16 +74,31 @@ else
 @code {
     private IReadOnlyList<UtgKit.Core.Services.ValueSetIndexEntry>? allItems;
     private List<UtgKit.Core.Services.ValueSetIndexEntry> filtered = [];
+    private UtgKit.Core.Services.IndexingProgress? loadingProgress;
 
     private string filterIdentity = "", filterName = "", filterVersion = "", filterStatus = "";
     private string filterOwner = "", filterDate = "", filterDescription = "";
     private string sortColumn = "Identity";
     private bool sortAscending = true;
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
-        allItems = ThoFileService.GetValueSetIndex();
+        loadingProgress = ThoFileService.CurrentIndexingProgress;
+        ThoFileService.IndexingProgressChanged += OnProgressChanged;
+
+        allItems = await ThoFileService.GetValueSetIndexAsync();
         ApplyFilter();
+    }
+
+    private void OnProgressChanged(UtgKit.Core.Services.IndexingProgress progress)
+    {
+        loadingProgress = progress;
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        ThoFileService.IndexingProgressChanged -= OnProgressChanged;
     }
 
     private void Sort(string column)

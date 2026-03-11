@@ -20,7 +20,19 @@ public class ThoFileService
     private readonly ILogger<ThoFileService> _logger;
 
     private readonly object _indexLock = new();
+    private readonly SemaphoreSlim _asyncIndexLock = new(1, 1);
     private ResourceIndex? _index;
+
+    /// <summary>
+    /// Raised during index building with the latest progress.
+    /// Fired from a background thread — subscribers must marshal to their own context.
+    /// </summary>
+    public event Action<IndexingProgress>? IndexingProgressChanged;
+
+    /// <summary>
+    /// The most recent indexing progress, or null if indexing has not started.
+    /// </summary>
+    public IndexingProgress? CurrentIndexingProgress { get; private set; }
 
     public ThoFileService(IOptions<ThoRepoSettings> settings, ILogger<ThoFileService> logger)
     {
@@ -32,6 +44,14 @@ public class ThoFileService
 
     public IReadOnlyList<CodeSystemIndexEntry> GetCodeSystemIndex()
         => EnsureIndex().CodeSystems.Values
+            .OrderBy(e => e.Title ?? e.Name ?? e.Id)
+            .ToList();
+
+    /// <summary>
+    /// Returns the CodeSystem index, reporting progress during initial build.
+    /// </summary>
+    public async System.Threading.Tasks.Task<IReadOnlyList<CodeSystemIndexEntry>> GetCodeSystemIndexAsync()
+        => (await EnsureIndexAsync()).CodeSystems.Values
             .OrderBy(e => e.Title ?? e.Name ?? e.Id)
             .ToList();
 
@@ -54,6 +74,14 @@ public class ThoFileService
 
     public IReadOnlyList<ValueSetIndexEntry> GetValueSetIndex()
         => EnsureIndex().ValueSets.Values
+            .OrderBy(e => e.Title ?? e.Name ?? e.Id)
+            .ToList();
+
+    /// <summary>
+    /// Returns the ValueSet index, reporting progress during initial build.
+    /// </summary>
+    public async System.Threading.Tasks.Task<IReadOnlyList<ValueSetIndexEntry>> GetValueSetIndexAsync()
+        => (await EnsureIndexAsync()).ValueSets.Values
             .OrderBy(e => e.Title ?? e.Name ?? e.Id)
             .ToList();
 
@@ -276,6 +304,37 @@ public class ThoFileService
         }
     }
 
+    /// <summary>
+    /// Ensures the resource index is built, reporting progress during the initial build.
+    /// Returns immediately if the index is already cached.
+    /// </summary>
+    private async System.Threading.Tasks.Task<ResourceIndex> EnsureIndexAsync()
+    {
+        // Fast path: index already built
+        if (_index is not null)
+            return _index;
+
+        await _asyncIndexLock.WaitAsync();
+        try
+        {
+            // Double-check after acquiring lock
+            if (_index is not null)
+                return _index;
+
+            _index = await System.Threading.Tasks.Task.Run(BuildIndex);
+            _logger.LogInformation(
+                "Built resource index: {CS} CodeSystems, {VS} ValueSets, {CM} ConceptMaps, " +
+                "{B} Bundles, {L} Lists, {P} Provenances",
+                _index.CodeSystems.Count, _index.ValueSets.Count, _index.ConceptMaps.Count,
+                _index.Bundles.Count, _index.Lists.Count, _index.Provenances.Count);
+            return _index;
+        }
+        finally
+        {
+            _asyncIndexLock.Release();
+        }
+    }
+
     private ResourceIndex BuildIndex()
     {
         var codeSystems = new Dictionary<string, CodeSystemIndexEntry>(StringComparer.OrdinalIgnoreCase);
@@ -286,7 +345,11 @@ public class ThoFileService
         var provenances = new Dictionary<string, ProvenanceIndexEntry>(StringComparer.OrdinalIgnoreCase);
         var history = new Dictionary<string, List<HistoryEntry>>(StringComparer.OrdinalIgnoreCase);
 
-        var files = FindAllFiles("*.xml").Concat(FindAllFiles("*.json"));
+        var files = FindAllFiles("*.xml").Concat(FindAllFiles("*.json")).ToList();
+        var totalFiles = files.Count;
+        var processedFiles = 0;
+
+        ReportProgress(new IndexingProgress(totalFiles, 0));
 
         foreach (var file in files)
         {
@@ -339,9 +402,19 @@ public class ThoFileService
                         file, p.Id, p.Recorded?.ToString("o"), p.Target?.Count ?? 0);
                     break;
             }
+
+            processedFiles++;
+            if (processedFiles % 50 == 0 || processedFiles == totalFiles)
+                ReportProgress(new IndexingProgress(totalFiles, processedFiles));
         }
 
         return new ResourceIndex(codeSystems, valueSets, conceptMaps, bundles, lists, provenances, history);
+    }
+
+    private void ReportProgress(IndexingProgress progress)
+    {
+        CurrentIndexingProgress = progress;
+        IndexingProgressChanged?.Invoke(progress);
     }
 
     private static void ExtractHistoryFromBundle(Bundle bundle, Dictionary<string, List<HistoryEntry>> history)
