@@ -14,7 +14,7 @@
   <ItemGroup>
     <PackageReference Include="brianpos.Fhir.R5.WebApi.AspNetCore" Version="5.13.2-rc1" />
     <PackageReference Include="Hl7.Fhir.R5" Version="5.13.2" />
-    <PackageReference Include="ModelContextProtocol.AspNetCore" Version="0.*" />
+    <PackageReference Include="ModelContextProtocol.AspNetCore" Version="1.1.0" />
   </ItemGroup>
 
 </Project>
