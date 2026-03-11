@@ -18,6 +18,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<ValueSetExpansionService>();
         services.AddHttpClient<ImportCodeSystemService>();
         services.AddHttpClient<ImportValueSetService>();
+        services.AddHostedService<ThoFileWatcher>();
         return services;
     }
 }

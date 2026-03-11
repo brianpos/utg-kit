@@ -30,6 +30,12 @@ public class ThoFileService
     public event Action<IndexingProgress>? IndexingProgressChanged;
 
     /// <summary>
+    /// Raised after the index is incrementally updated (file added, changed, or removed).
+    /// Subscribers should marshal to their own context.
+    /// </summary>
+    public event Action? IndexChanged;
+
+    /// <summary>
     /// The most recent indexing progress, or null if indexing has not started.
     /// </summary>
     public IndexingProgress? CurrentIndexingProgress { get; private set; }
@@ -326,6 +332,185 @@ public class ThoFileService
             _index = null;
         }
     }
+
+    #region File-Watcher Suppression
+
+    private int _suppressionCount;
+
+    /// <summary>
+    /// Returns true when file-watcher processing should be suppressed
+    /// (e.g. because an import operation is writing files).
+    /// </summary>
+    public bool IsWatcherSuppressed => Volatile.Read(ref _suppressionCount) > 0;
+
+    /// <summary>
+    /// Suppresses file-watcher processing for the lifetime of the returned token.
+    /// Dispose the token to re-enable watching. Calls nest safely.
+    /// </summary>
+    public IDisposable SuppressWatcher()
+    {
+        Interlocked.Increment(ref _suppressionCount);
+        return new SuppressionToken(this);
+    }
+
+    private sealed class SuppressionToken(ThoFileService owner) : IDisposable
+    {
+        private int _disposed;
+        public void Dispose()
+        {
+            if (Interlocked.Exchange(ref _disposed, 1) == 0)
+                Interlocked.Decrement(ref owner._suppressionCount);
+        }
+    }
+
+    #endregion
+
+    #region Incremental Index Updates
+
+    /// <summary>
+    /// Re-parses a single file and upserts its entry in the in-memory index.
+    /// If the file no longer exists or cannot be parsed, the previous entry (if any) is removed.
+    /// Returns true if the index was modified.
+    /// </summary>
+    public bool ReindexFile(string filePath)
+    {
+        lock (_indexLock)
+        {
+            if (_index is null)
+                return false; // index not built yet; nothing to update
+
+            // Remove any previous entry for this file path first
+            var removed = RemoveFromIndexByPath(_index, filePath);
+
+            if (!File.Exists(filePath))
+            {
+                if (removed)
+                {
+                    _logger.LogInformation("Removed deleted file from index: {Path}", filePath);
+                    IndexChanged?.Invoke();
+                }
+                return removed;
+            }
+
+            var resource = ParseResource<Resource>(filePath);
+            if (resource?.Id is null)
+            {
+                if (removed)
+                {
+                    _logger.LogInformation("Removed unparseable file from index: {Path}", filePath);
+                    IndexChanged?.Invoke();
+                }
+                return removed;
+            }
+
+            var added = AddToIndex(_index, filePath, resource);
+            if (added || removed)
+            {
+                _logger.LogInformation("Reindexed file: {Path} ({Type}/{Id})",
+                    filePath, resource.TypeName, resource.Id);
+                IndexChanged?.Invoke();
+            }
+            return added || removed;
+        }
+    }
+
+    /// <summary>
+    /// Removes all index entries that reference the given file path.
+    /// Returns true if the index was modified.
+    /// </summary>
+    public bool RemoveFileFromIndex(string filePath)
+    {
+        lock (_indexLock)
+        {
+            if (_index is null)
+                return false;
+
+            var removed = RemoveFromIndexByPath(_index, filePath);
+            if (removed)
+            {
+                _logger.LogInformation("Removed file from index: {Path}", filePath);
+                IndexChanged?.Invoke();
+            }
+            return removed;
+        }
+    }
+
+    private bool AddToIndex(ResourceIndex index, string filePath, Resource resource)
+    {
+        switch (resource)
+        {
+            case CodeSystem cs:
+                index.CodeSystems[cs.Id] = new CodeSystemIndexEntry(
+                    filePath, cs.Id, cs.Url, cs.Version, cs.Name, cs.Title,
+                    cs.Status, cs.Description, GetOwner(cs), cs.Date,
+                    cs.Content, CountConcepts(cs.Concept));
+                return true;
+
+            case ValueSet vs:
+                var referencedSystems = vs.Compose?.Include?
+                    .Select(i => i.System)
+                    .Where(s => !string.IsNullOrEmpty(s))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList() ?? [];
+                index.ValueSets[vs.Id] = new ValueSetIndexEntry(
+                    filePath, vs.Id, vs.Url, vs.Version, vs.Name, vs.Title,
+                    vs.Status, vs.Description, GetOwner(vs), vs.Date,
+                    referencedSystems!);
+                return true;
+
+            case ConceptMap cm:
+                index.ConceptMaps[cm.Id] = new ConceptMapIndexEntry(
+                    filePath, cm.Id, cm.Url, cm.Version, cm.Name, cm.Title,
+                    cm.Status, cm.Description, GetOwner(cm), cm.Date,
+                    (cm.SourceScope as FhirUri)?.Value ?? (cm.SourceScope as Canonical)?.Value,
+                    (cm.TargetScope as FhirUri)?.Value ?? (cm.TargetScope as Canonical)?.Value);
+                return true;
+
+            case Bundle b:
+                index.Bundles[b.Id] = new BundleIndexEntry(
+                    filePath, b.Id, b.Type, b.Entry?.Count ?? 0);
+                ExtractHistoryFromBundle(b, index.History);
+                return true;
+
+            case FhirList l:
+                index.Lists[l.Id] = new ListIndexEntry(
+                    filePath, l.Id, l.Title, l.Status, l.Mode, l.Entry?.Count ?? 0);
+                return true;
+
+            case Provenance p:
+                index.Provenances[p.Id] = new ProvenanceIndexEntry(
+                    filePath, p.Id, p.Recorded?.ToString("o"), p.Target?.Count ?? 0);
+                return true;
+
+            default:
+                return false;
+        }
+    }
+
+    private static bool RemoveFromIndexByPath(ResourceIndex index, string filePath)
+    {
+        var removed = false;
+        removed |= RemoveByPath(index.CodeSystems, filePath);
+        removed |= RemoveByPath(index.ValueSets, filePath);
+        removed |= RemoveByPath(index.ConceptMaps, filePath);
+        removed |= RemoveByPath(index.Bundles, filePath);
+        removed |= RemoveByPath(index.Lists, filePath);
+        removed |= RemoveByPath(index.Provenances, filePath);
+        return removed;
+    }
+
+    private static bool RemoveByPath<T>(Dictionary<string, T> dict, string filePath) where T : ResourceIndexEntry
+    {
+        var key = dict.FirstOrDefault(kv => string.Equals(kv.Value.FilePath, filePath, StringComparison.OrdinalIgnoreCase)).Key;
+        if (key is not null)
+        {
+            dict.Remove(key);
+            return true;
+        }
+        return false;
+    }
+
+    #endregion
 
     /// <summary>
     /// Returns the top-level content subdirectory names within the THO repository

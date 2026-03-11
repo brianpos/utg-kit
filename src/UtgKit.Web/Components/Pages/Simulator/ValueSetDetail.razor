@@ -4,6 +4,7 @@
 @using Hl7.Fhir.Model
 @inject UtgKit.Core.Services.ThoFileService ThoFileService
 @inject UtgKit.Core.Services.ValueSetExpansionService ExpansionService
+@implements IDisposable
 
 <PageTitle>@(valueSet?.Title ?? valueSet?.Name ?? Id) — HL7 Terminology (THO)</PageTitle>
 
@@ -239,6 +240,13 @@ else
 
     protected override void OnParametersSet()
     {
+        ThoFileService.IndexChanged -= OnIndexChanged;
+        ThoFileService.IndexChanged += OnIndexChanged;
+        LoadData();
+    }
+
+    private void LoadData()
+    {
         loadedCodeSystems.Clear();
         valueSet = ThoFileService.LoadValueSet(Id);
 
@@ -266,6 +274,20 @@ else
         }
 
         LoadManifestGroupInfo();
+    }
+
+    private void OnIndexChanged()
+    {
+        InvokeAsync(() =>
+        {
+            LoadData();
+            StateHasChanged();
+        });
+    }
+
+    public void Dispose()
+    {
+        ThoFileService.IndexChanged -= OnIndexChanged;
     }
 
     private void LoadManifestGroupInfo()

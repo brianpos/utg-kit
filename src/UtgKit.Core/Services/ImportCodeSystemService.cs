@@ -115,7 +115,9 @@ public class ImportCodeSystemService
                 $"A CodeSystem with id '{codeSystem.Id}' already exists in the repository ({existing.FilePath}).");
         }
 
-        // 4. Save as XML to destination folder
+        // 4. Save as XML to destination folder — suppress file watcher to avoid re-indexing our own writes
+        using var _ = _thoFileService.SuppressWatcher();
+
         var codeSystemDir = Path.Combine(_settings.Path, destinationFolder, "codeSystems");
         Directory.CreateDirectory(codeSystemDir);
 

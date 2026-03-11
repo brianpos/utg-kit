@@ -96,6 +96,7 @@ else
     {
         loadingProgress = ThoFileService.CurrentIndexingProgress;
         ThoFileService.IndexingProgressChanged += OnProgressChanged;
+        ThoFileService.IndexChanged += OnIndexChanged;
 
         allItems = await System.Threading.Tasks.Task.Run(() => ThoFileService.GetConceptMapIndex());
         manifestGroups = ThoFileService.GetManifestGroups();
@@ -108,9 +109,21 @@ else
         InvokeAsync(StateHasChanged);
     }
 
+    private void OnIndexChanged()
+    {
+        InvokeAsync(() =>
+        {
+            allItems = ThoFileService.GetConceptMapIndex();
+            manifestGroups = ThoFileService.GetManifestGroups();
+            ApplyFilter();
+            StateHasChanged();
+        });
+    }
+
     public void Dispose()
     {
         ThoFileService.IndexingProgressChanged -= OnProgressChanged;
+        ThoFileService.IndexChanged -= OnIndexChanged;
     }
 
     private void Sort(string column)

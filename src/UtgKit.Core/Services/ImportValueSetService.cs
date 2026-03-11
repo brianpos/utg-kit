@@ -288,7 +288,9 @@ public class ImportValueSetService
                 $"A ValueSet with id '{valueSet.Id}' already exists in the repository ({existing.FilePath}).", []);
         }
 
-        // 4. Optionally import referenced CodeSystems
+        // 4. Optionally import referenced CodeSystems — suppress file watcher during all writes
+        using var _ = _thoFileService.SuppressWatcher();
+
         var codeSystemResults = new List<ImportCodeSystemResult>();
         if (importReferencedCodeSystems)
         {

@@ -3,6 +3,7 @@
 @rendermode InteractiveServer
 @using Hl7.Fhir.Model
 @inject UtgKit.Core.Services.ThoFileService ThoFileService
+@implements IDisposable
 
 <PageTitle>@(codeSystem?.Title ?? codeSystem?.Name ?? Id) — HL7 Terminology (THO)</PageTitle>
 
@@ -128,7 +129,7 @@ else
         }
         <p>
             This @(codeSystem.CaseSensitive == true ? "case-sensitive " : "")code system
-            <code>@codeSystem.Url</code> defines the following codes:
+            <code>@codeSystem.Url</code> defines the following codes@(hasNestedConcepts ? " in an undefined hierarchy" : ""):
         </p>
     </div>
 
@@ -137,16 +138,24 @@ else
         <table class="tho-concept-table">
             <thead>
                 <tr>
+                    @if (hasNestedConcepts)
+                    {
+                        <th>Lvl</th>
+                    }
                     <th>Code</th>
                     <th>Display</th>
                     <th>Definition</th>
                 </tr>
             </thead>
             <tbody>
-                @foreach (var concept in FlattenConcepts(codeSystem.Concept))
+                @foreach (var (level, concept) in FlattenConceptsWithLevel(codeSystem.Concept))
                 {
                     <tr>
-                        <td><code>@concept.Code</code></td>
+                        @if (hasNestedConcepts)
+                        {
+                            <td>@level</td>
+                        }
+                        <td style="padding-left: @(0.75 + (level - 1) * 1.2)rem"><code>@concept.Code</code></td>
                         <td>@concept.Display</td>
                         <td>@concept.Definition</td>
                     </tr>
@@ -166,6 +175,7 @@ else
 
     private CodeSystem? codeSystem;
     private string? fmm;
+    private bool hasNestedConcepts;
     private Tab activeTab = Tab.Narrative;
     private string? xmlContent;
     private string? jsonContent;
@@ -177,6 +187,13 @@ else
     private enum Tab { Narrative, Xml, Json }
 
     protected override void OnParametersSet()
+    {
+        ThoFileService.IndexChanged -= OnIndexChanged;
+        ThoFileService.IndexChanged += OnIndexChanged;
+        LoadData();
+    }
+
+    private void LoadData()
     {
         codeSystem = ThoFileService.LoadCodeSystem(Id);
 
@@ -192,9 +209,24 @@ else
             referencingValueSets = !string.IsNullOrEmpty(codeSystem.Url)
                 ? ThoFileService.GetValueSetsReferencingCodeSystem(codeSystem.Url)
                 : [];
+            hasNestedConcepts = codeSystem.Concept?.Any(c => c.Concept?.Count > 0) == true;
         }
 
         LoadManifestGroupInfo();
+    }
+
+    private void OnIndexChanged()
+    {
+        InvokeAsync(() =>
+        {
+            LoadData();
+            StateHasChanged();
+        });
+    }
+
+    public void Dispose()
+    {
+        ThoFileService.IndexChanged -= OnIndexChanged;
     }
 
     private void LoadManifestGroupInfo()
@@ -220,16 +252,16 @@ else
     }
 
     /// <summary>
-    /// Recursively flattens nested concept hierarchies into a single list.
+    /// Recursively flattens nested concept hierarchies, returning each concept with its nesting level (1-based).
     /// </summary>
-    private static IEnumerable<CodeSystem.ConceptDefinitionComponent> FlattenConcepts(
-        List<CodeSystem.ConceptDefinitionComponent>? concepts)
+    private static IEnumerable<(int Level, CodeSystem.ConceptDefinitionComponent Concept)> FlattenConceptsWithLevel(
+        List<CodeSystem.ConceptDefinitionComponent>? concepts, int level = 1)
     {
         if (concepts is null) yield break;
         foreach (var concept in concepts)
         {
-            yield return concept;
-            foreach (var child in FlattenConcepts(concept.Concept))
+            yield return (level, concept);
+            foreach (var child in FlattenConceptsWithLevel(concept.Concept, level + 1))
                 yield return child;
         }
     }
