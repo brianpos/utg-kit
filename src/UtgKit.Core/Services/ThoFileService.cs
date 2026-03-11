@@ -644,6 +644,32 @@ public class ThoFileService
             case FhirList l:
                 index.Lists[l.Id] = new ListIndexEntry(
                     filePath, l.Id, l.Title, l.Status, l.Mode, l.Entry?.Count ?? 0);
+
+                // If this List is a rendering manifest, update the manifest group index.
+                if (TryGetManifestGroupName(filePath, out var groupName))
+                {
+                    var refs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    if (l.Entry is not null)
+                    {
+                        foreach (var entry in l.Entry)
+                        {
+                            var reference = entry.Item?.Reference;
+                            if (string.IsNullOrEmpty(reference))
+                                continue;
+
+                            refs.Add(reference);
+
+                            if (!index.ManifestGroupMembers.TryGetValue(reference, out var groups))
+                            {
+                                groups = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                                index.ManifestGroupMembers[reference] = groups;
+                            }
+                            groups.Add(groupName);
+                        }
+                    }
+                    index.ManifestGroups[groupName] = refs;
+                }
+
                 return true;
 
             case Provenance p:
@@ -678,6 +704,25 @@ public class ThoFileService
 
         removed |= RemoveByPath(index.Lists, filePath);
         removed |= RemoveByPath(index.Provenances, filePath);
+
+        // When removing a rendering manifest, clear its manifest group data so that
+        // a subsequent re-index (via AddToIndex) rebuilds it cleanly.
+        if (TryGetManifestGroupName(filePath, out var removedGroup)
+            && index.ManifestGroups.TryGetValue(removedGroup, out var oldRefs))
+        {
+            foreach (var r in oldRefs)
+            {
+                if (index.ManifestGroupMembers.TryGetValue(r, out var memberGroups))
+                {
+                    memberGroups.Remove(removedGroup);
+                    if (memberGroups.Count == 0)
+                        index.ManifestGroupMembers.Remove(r);
+                }
+            }
+            index.ManifestGroups.Remove(removedGroup);
+            removed = true;
+        }
+
         return removed;
     }
 
@@ -690,6 +735,25 @@ public class ThoFileService
             return true;
         }
         return false;
+    }
+
+    /// <summary>
+    /// Checks whether <paramref name="filePath"/> is a rendering manifest
+    /// (e.g. control-manifests/fhir-Rendering.xml) and extracts the group name.
+    /// </summary>
+    private static bool TryGetManifestGroupName(string filePath, out string groupName)
+    {
+        groupName = "";
+        var fileName = Path.GetFileName(filePath);
+        if (!fileName.EndsWith("-Rendering.xml", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        var parentDir = Path.GetFileName(Path.GetDirectoryName(filePath));
+        if (!string.Equals(parentDir, "control-manifests", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        groupName = fileName[..fileName.IndexOf("-Rendering", StringComparison.OrdinalIgnoreCase)];
+        return true;
     }
 
     #endregion
