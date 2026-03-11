@@ -316,7 +316,14 @@ public class ThoFileService
         if (!index.History.TryGetValue(resourceReference, out var entries))
             return [];
 
-        return entries.OrderByDescending(e => e.Date).ToList();
+        // Entries are stored in file order (earliest index first).
+        // Reverse so that later-in-file entries come first, then stable-sort
+        // by date descending - this keeps "last in file = top" for same dates.
+        return entries
+            .AsEnumerable()
+            .Reverse()
+            .OrderByDescending(e => e.Date)
+            .ToList();
     }
 
     /// <summary>

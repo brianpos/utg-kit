@@ -1,3 +1,4 @@
+@implements IDisposable
 @inject UtgKit.Core.Services.ThoFileService ThoFileService
 @inject IJSRuntime JS
 
@@ -110,7 +111,23 @@ else
 
     protected override void OnParametersSet()
     {
+        ThoFileService.IndexChanged -= OnIndexChanged;
+        ThoFileService.IndexChanged += OnIndexChanged;
         entries = ThoFileService.GetResourceHistory(ResourceReference);
+    }
+
+    private void OnIndexChanged()
+    {
+        InvokeAsync(() =>
+        {
+            entries = ThoFileService.GetResourceHistory(ResourceReference);
+            StateHasChanged();
+        });
+    }
+
+    public void Dispose()
+    {
+        ThoFileService.IndexChanged -= OnIndexChanged;
     }
 
     private bool CanSubmit => !string.IsNullOrWhiteSpace(changeComment);
