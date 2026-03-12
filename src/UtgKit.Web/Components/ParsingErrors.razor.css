@@ -1,0 +1,59 @@
+.parsing-errors {
+    margin: 1rem 0;
+}
+
+.parsing-errors-summary {
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: #856404;
+    background: #fff3cd;
+    border: 1px solid #ffc107;
+    border-radius: 4px;
+    padding: 0.5rem 0.75rem;
+    user-select: none;
+}
+
+.parsing-errors-summary:hover {
+    background: #ffe69c;
+}
+
+.parsing-errors-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 0.5rem;
+    font-size: 0.8rem;
+}
+
+.parsing-errors-table th {
+    text-align: left;
+    padding: 0.4rem 0.75rem;
+    background: #fff3cd;
+    border: 1px solid #ffc107;
+    font-weight: 600;
+    color: #856404;
+}
+
+.parsing-errors-table td {
+    padding: 0.4rem 0.75rem;
+    border: 1px solid #dee2e6;
+    vertical-align: top;
+}
+
+.parsing-errors-path {
+    font-family: monospace;
+    font-size: 0.78rem;
+    word-break: break-all;
+    max-width: 300px;
+}
+
+.parsing-errors-message {
+    color: #721c24;
+    max-width: 500px;
+    overflow-wrap: break-word;
+}
+
+.parsing-errors-time {
+    white-space: nowrap;
+    color: #6c757d;
+}

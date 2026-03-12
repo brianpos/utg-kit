@@ -36,9 +36,60 @@ public class ThoFileService
     public event Action? IndexChanged;
 
     /// <summary>
+    /// Raised when the set of parsing errors changes (initial scan or file watcher update).
+    /// Subscribers should marshal to their own context.
+    /// </summary>
+    public event Action? ParsingErrorsChanged;
+
+    /// <summary>
     /// The most recent indexing progress, or null if indexing has not started.
     /// </summary>
     public IndexingProgress? CurrentIndexingProgress { get; private set; }
+
+    private readonly object _parsingErrorsLock = new();
+    private readonly Dictionary<string, ParsingError> _parsingErrors = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Returns a snapshot of the current parsing errors, keyed by file path.
+    /// </summary>
+    public IReadOnlyList<ParsingError> GetParsingErrors()
+    {
+        lock (_parsingErrorsLock)
+        {
+            return [.. _parsingErrors.Values.OrderBy(e => e.FilePath, StringComparer.OrdinalIgnoreCase)];
+        }
+    }
+
+    /// <summary>
+    /// Records a parsing error for a file. If the file already has an error, it is replaced.
+    /// </summary>
+    private void AddParsingError(string filePath, string errorMessage)
+    {
+        lock (_parsingErrorsLock)
+        {
+            _parsingErrors[filePath] = new ParsingError(filePath, errorMessage, DateTimeOffset.UtcNow);
+        }
+    }
+
+    /// <summary>
+    /// Clears any parsing error previously recorded for the given file path.
+    /// Returns true if an error was removed.
+    /// </summary>
+    private bool ClearParsingError(string filePath)
+    {
+        lock (_parsingErrorsLock)
+        {
+            return _parsingErrors.Remove(filePath);
+        }
+    }
+
+    private int GetParsingErrorCount()
+    {
+        lock (_parsingErrorsLock)
+        {
+            return _parsingErrors.Count;
+        }
+    }
 
     public ThoFileService(IOptions<ThoRepoSettings> settings, ILogger<ThoFileService> logger)
     {
@@ -500,6 +551,11 @@ public class ThoFileService
         {
             _index = null;
         }
+        lock (_parsingErrorsLock)
+        {
+            _parsingErrors.Clear();
+        }
+        ParsingErrorsChanged?.Invoke();
     }
 
     #region File-Watcher Suppression
@@ -553,17 +609,23 @@ public class ThoFileService
 
             if (!File.Exists(filePath))
             {
-                if (removed)
+                var errorCleared = ClearParsingError(filePath);
+                if (removed || errorCleared)
                 {
                     _logger.LogInformation("Removed deleted file from index: {Path}", filePath);
                     IndexChanged?.Invoke();
+                    if (errorCleared) ParsingErrorsChanged?.Invoke();
                 }
                 return removed;
             }
 
+            var errorCountBefore = GetParsingErrorCount();
             var resource = ParseResource<Resource>(filePath);
             if (resource?.Id is null)
             {
+                // ParseResource recorded the error (if any) — notify only if the set changed.
+                if (GetParsingErrorCount() != errorCountBefore)
+                    ParsingErrorsChanged?.Invoke();
                 if (removed)
                 {
                     _logger.LogInformation("Removed unparseable file from index: {Path}", filePath);
@@ -571,6 +633,10 @@ public class ThoFileService
                 }
                 return removed;
             }
+
+            // File parsed successfully — clear any previous error
+            if (ClearParsingError(filePath))
+                ParsingErrorsChanged?.Invoke();
 
             var added = AddToIndex(_index, filePath, resource);
             if (added || removed)
@@ -595,12 +661,14 @@ public class ThoFileService
                 return false;
 
             var removed = RemoveFromIndexByPath(_index, filePath);
+            var errorCleared = ClearParsingError(filePath);
             if (removed)
             {
                 _logger.LogInformation("Removed file from index: {Path}", filePath);
                 IndexChanged?.Invoke();
             }
-            return removed;
+            if (errorCleared) ParsingErrorsChanged?.Invoke();
+            return removed || errorCleared;
         }
     }
 
@@ -895,6 +963,12 @@ public class ThoFileService
 
     private ResourceIndex BuildIndex()
     {
+        // Clear previous parsing errors — they will be re-populated during the scan.
+        lock (_parsingErrorsLock)
+        {
+            _parsingErrors.Clear();
+        }
+
         var codeSystems = new Dictionary<string, CodeSystemIndexEntry>(StringComparer.OrdinalIgnoreCase);
         var valueSets = new Dictionary<string, ValueSetIndexEntry>(StringComparer.OrdinalIgnoreCase);
         var conceptMaps = new Dictionary<string, ConceptMapIndexEntry>(StringComparer.OrdinalIgnoreCase);
@@ -970,6 +1044,8 @@ public class ThoFileService
         var manifestGroups = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
         var manifestGroupMembers = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
         BuildManifestGroupIndex(manifestGroups, manifestGroupMembers);
+
+        ParsingErrorsChanged?.Invoke();
 
         return new ResourceIndex(codeSystems, valueSets, conceptMaps, bundles, lists, provenances, history, manifestGroups, manifestGroupMembers);
     }
@@ -1117,6 +1193,7 @@ public class ThoFileService
         catch (Exception ex)
         {
             _logger.LogDebug(ex, "Skipped file during indexing: {Path}", path);
+            AddParsingError(path, ex.Message);
             return null;
         }
     }

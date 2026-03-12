@@ -1,0 +1,70 @@
+@implements IDisposable
+@inject UtgKit.Core.Services.ThoFileService ThoFileService
+@inject Microsoft.Extensions.Options.IOptions<UtgKit.Core.ThoRepoSettings> RepoSettings
+
+@if (errors.Count > 0)
+{
+    <div class="parsing-errors">
+        <details @bind:open="isOpen">
+            <summary class="parsing-errors-summary">
+                ⚠ @errors.Count parsing error@(errors.Count == 1 ? "" : "s") detected
+            </summary>
+            <table class="parsing-errors-table">
+                <thead>
+                    <tr>
+                        <th>File</th>
+                        <th>Error</th>
+                        <th>Detected</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var error in errors)
+                    {
+                        <tr>
+                            <td class="parsing-errors-path" title="@error.FilePath">@GetRelativePath(error.FilePath)</td>
+                            <td class="parsing-errors-message">@error.ErrorMessage</td>
+                            <td class="parsing-errors-time">@error.DetectedAt.LocalDateTime.ToString("HH:mm:ss")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </details>
+    </div>
+}
+
+@code {
+    private IReadOnlyList<UtgKit.Core.Services.ParsingError> errors = [];
+    private bool isOpen = true;
+
+    protected override void OnInitialized()
+    {
+        ThoFileService.ParsingErrorsChanged += OnParsingErrorsChanged;
+        errors = ThoFileService.GetParsingErrors();
+    }
+
+    private void OnParsingErrorsChanged()
+    {
+        InvokeAsync(() =>
+        {
+            errors = ThoFileService.GetParsingErrors();
+            StateHasChanged();
+        });
+    }
+
+    public void Dispose()
+    {
+        ThoFileService.ParsingErrorsChanged -= OnParsingErrorsChanged;
+    }
+
+    private string GetRelativePath(string fullPath)
+    {
+        var repoPath = RepoSettings.Value.Path;
+        if (!string.IsNullOrEmpty(repoPath)
+            && fullPath.StartsWith(repoPath, StringComparison.OrdinalIgnoreCase))
+        {
+            return fullPath[repoPath.Length..].TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        }
+
+        return Path.GetFileName(fullPath);
+    }
+}
