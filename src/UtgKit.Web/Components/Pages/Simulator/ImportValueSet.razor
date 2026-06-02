@@ -51,6 +51,21 @@
         }
     </div>
 
+    <div class="form-group form-checkbox-group">
+        <label>
+            <input type="checkbox" @bind="resetCanonicalUrl" />
+            Reset canonical URL to <code>http://terminology.hl7.org/</code>
+        </label>
+        <span class="form-hint">
+            When checked, if the imported ValueSet's canonical URL starts with
+            <code>http://hl7.org/fhir/</code> it will be rebased onto
+            <code>http://terminology.hl7.org/</code> before saving
+            (e.g. <code>http://hl7.org/fhir/ValueSet/A</code> &rarr;
+            <code>http://terminology.hl7.org/ValueSet/A</code>).
+            This setting is also applied to any referenced CodeSystems imported below.
+        </span>
+    </div>
+
     <div class="form-group">
         <label for="destinationFolder">Destination Folder</label>
         <select id="destinationFolder" class="form-select" @bind="selectedFolder">
@@ -163,6 +178,7 @@
     private string selectedHistoryFile = "";
     private string changeComment = "";
     private bool importReferencedCodeSystems;
+    private bool resetCanonicalUrl;
     private IReadOnlyList<string> folders = [];
     private IReadOnlyList<string> historyFiles = [];
 
@@ -221,7 +237,8 @@
                 string.IsNullOrEmpty(selectedHistoryFile) ? null : selectedHistoryFile,
                 authorName,
                 custodianName,
-                importReferencedCodeSystems);
+                importReferencedCodeSystems,
+                resetCanonicalUrl);
 
             codeSystemResults = result.CodeSystemResults;
 

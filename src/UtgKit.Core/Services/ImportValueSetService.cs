@@ -244,6 +244,7 @@ public class ImportValueSetService
         string? authorName,
         string? custodianName,
         bool importReferencedCodeSystems,
+        bool resetCanonicalUrl = false,
         CancellationToken cancellationToken = default)
     {
         // 1. Normalize URL to JSON
@@ -278,7 +279,19 @@ public class ImportValueSetService
         if (string.IsNullOrEmpty(valueSet.Id))
             return new ImportValueSetResult(false, null, null, "The ValueSet has no id element.", []);
 
-        // 3b. Reject duplicate — a ValueSet with this id already exists in the repo
+        // 3a. Optionally rebase the canonical URL onto the THO host
+        if (resetCanonicalUrl)
+        {
+            var rebased = ImportCodeSystemService.RebaseToThoCanonical(valueSet.Url);
+            if (!string.Equals(rebased, valueSet.Url, StringComparison.Ordinal))
+            {
+                _logger.LogInformation(
+                    "Rebasing ValueSet canonical URL {Old} -> {New}", valueSet.Url, rebased);
+                valueSet.Url = rebased;
+            }
+        }
+
+        // 3b. Reject duplicate
         var existing = _thoFileService.GetValueSetIndexEntry(valueSet.Id);
         if (existing is not null)
         {
@@ -287,8 +300,19 @@ public class ImportValueSetService
                 $"A ValueSet with id '{valueSet.Id}' already exists in the repository ({existing.FilePath}).", []);
         }
 
-        // 4. Optionally import referenced CodeSystems — suppress file watcher during all writes
-        using var _ = _thoFileService.SuppressWatcher();
+		// 3c. Reset some properties that need to be cleared when importing
+		valueSet.Text = null;
+		valueSet.Date = DateTime.Today.ToString("yyyy-MM-dd");
+		valueSet.Experimental = false;
+		if (valueSet.Status == PublicationStatus.Draft)
+			valueSet.Status = PublicationStatus.Active;
+		valueSet.RemoveExtension("http://hl7.org/fhir/StructureDefinition/structuredefinition-standards-status");
+		var fmm = valueSet.GetIntegerExtension("http://hl7.org/fhir/StructureDefinition/structuredefinition-fmm");
+		if (fmm == 0)
+			valueSet.SetIntegerExtension("http://hl7.org/fhir/StructureDefinition/structuredefinition-fmm", 1);
+
+		// 4. Optionally import referenced CodeSystems — suppress file watcher during all writes
+		using var _ = _thoFileService.SuppressWatcher();
 
         var codeSystemResults = new List<ImportCodeSystemResult>();
         if (importReferencedCodeSystems)
@@ -324,6 +348,7 @@ public class ImportValueSetService
                     historyFile,
                     authorName,
                     custodianName,
+                    resetCanonicalUrl,
                     cancellationToken);
 
                 codeSystemResults.Add(csResult);

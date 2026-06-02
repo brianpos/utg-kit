@@ -62,6 +62,31 @@ public class ImportCodeSystemService
     }
 
     /// <summary>
+    /// Canonical URL prefix used by FHIR core resources.
+    /// </summary>
+    private const string FhirCoreCanonicalPrefix = "http://hl7.org/fhir/";
+
+    /// <summary>
+    /// THO canonical URL prefix that core FHIR resources are rebased to when
+    /// the user requests a canonical URL reset during import.
+    /// </summary>
+    private const string ThoCanonicalPrefix = "http://terminology.hl7.org/";
+
+    /// <summary>
+    /// If <paramref name="canonicalUrl"/> starts with the FHIR core canonical prefix,
+    /// returns the same URL rebased to the THO canonical prefix. Otherwise returns
+    /// the original URL unchanged.
+    /// </summary>
+    public static string? RebaseToThoCanonical(string? canonicalUrl)
+    {
+        if (string.IsNullOrEmpty(canonicalUrl))
+            return canonicalUrl;
+        if (canonicalUrl.StartsWith(FhirCoreCanonicalPrefix, StringComparison.OrdinalIgnoreCase))
+            return ThoCanonicalPrefix + canonicalUrl[FhirCoreCanonicalPrefix.Length..];
+        return canonicalUrl;
+    }
+
+    /// <summary>
     /// Executes the full import: download, validate, save, update manifest, append provenance.
     /// </summary>
     public async Task<ImportCodeSystemResult> ImportAsync(
@@ -71,6 +96,7 @@ public class ImportCodeSystemService
         string? historyFile,
         string? authorName,
         string? custodianName,
+        bool resetCanonicalUrl = false,
         CancellationToken cancellationToken = default)
     {
         // 1. Normalize URL to JSON
@@ -105,7 +131,20 @@ public class ImportCodeSystemService
         if (string.IsNullOrEmpty(codeSystem.Id))
             return new ImportCodeSystemResult(false, null, null, "The CodeSystem has no id element.");
 
-        // 3b. Reject duplicate — a CodeSystem with this id already exists in the repo
+        // 3a. Optionally rebase the canonical URL onto the THO host
+        if (resetCanonicalUrl)
+        {
+            var rebased = RebaseToThoCanonical(codeSystem.Url);
+            if (!string.Equals(rebased, codeSystem.Url, StringComparison.Ordinal))
+            {
+                _logger.LogInformation(
+                    "Rebasing CodeSystem canonical URL {Old} -> {New}", codeSystem.Url, rebased);
+                codeSystem.Url = rebased;
+				//codeSystem.Version = ???
+			}
+		}
+
+        // 3b. Reject duplicate
         var existing = _thoFileService.GetCodeSystemIndexEntry(codeSystem.Id);
         if (existing is not null)
         {
@@ -114,8 +153,21 @@ public class ImportCodeSystemService
                 $"A CodeSystem with id '{codeSystem.Id}' already exists in the repository ({existing.FilePath}).");
         }
 
-        // 4. Save as XML to destination folder — suppress file watcher to avoid re-indexing our own writes
-        using var _ = _thoFileService.SuppressWatcher();
+		// 3c. Reset some properties that need to be cleared when importing
+		codeSystem.Text = null;
+		codeSystem.Date = DateTime.Today.ToString("yyyy-MM-dd");
+		codeSystem.Experimental = false;
+		if (codeSystem.Status == PublicationStatus.Draft)
+			codeSystem.Status = PublicationStatus.Active;
+		codeSystem.RemoveExtension("http://hl7.org/fhir/StructureDefinition/structuredefinition-standards-status");
+		var fmm = codeSystem.GetIntegerExtension("http://hl7.org/fhir/StructureDefinition/structuredefinition-fmm");
+		if (fmm == 0)
+			codeSystem.SetIntegerExtension("http://hl7.org/fhir/StructureDefinition/structuredefinition-fmm", 1);
+
+		// The codesystem's valueSet property (that is the entire codesystem one) is managed by the UI
+
+		// 4. Save as XML to destination folder — suppress file watcher to avoid re-indexing our own writes
+		using var _ = _thoFileService.SuppressWatcher();
 
         var codeSystemDir = Path.Combine(_settings.Path, destinationFolder, "codeSystems");
         Directory.CreateDirectory(codeSystemDir);

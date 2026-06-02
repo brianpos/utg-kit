@@ -51,6 +51,19 @@
         }
     </div>
 
+    <div class="form-group form-checkbox-group">
+        <label>
+            <input type="checkbox" @bind="resetCanonicalUrl" />
+            Reset canonical URL to <code>http://terminology.hl7.org/</code>
+        </label>
+        <span class="form-hint">
+            When checked, if the imported CodeSystem's canonical URL starts with
+            <code>http://hl7.org/fhir/</code> it will be rebased onto
+            <code>http://terminology.hl7.org/</code> before saving
+            (e.g. <code>http://hl7.org/fhir/B</code> &rarr; <code>http://terminology.hl7.org/B</code>).
+        </span>
+    </div>
+
     <div class="form-group">
         <label for="destinationFolder">Destination Folder</label>
         <select id="destinationFolder" class="form-select" @bind="selectedFolder">
@@ -127,6 +140,7 @@
     private string selectedFolder = "";
     private string selectedHistoryFile = "";
     private string changeComment = "";
+    private bool resetCanonicalUrl;
     private IReadOnlyList<string> folders = [];
     private IReadOnlyList<string> historyFiles = [];
 
@@ -182,7 +196,8 @@
                 changeComment,
                 string.IsNullOrEmpty(selectedHistoryFile) ? null : selectedHistoryFile,
                 authorName,
-                custodianName);
+                custodianName,
+                resetCanonicalUrl);
 
             if (result.Success)
             {
