@@ -1,14 +1,83 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
-    <RootNamespace>UtgKit.Web</RootNamespace>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
+		<TargetFramework>net10.0</TargetFramework>
+		<AssemblyName>UtgKit</AssemblyName>
+		<RootNamespace>UtgKit.Web</RootNamespace>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<!--
+			Suppress NU5118 ("file already in package") during pack. The default
+			Static Web Assets pack pipeline and our IncludePublishOutputInToolPackage
+			target both contribute the same wwwroot/_framework files; NuGet keeps
+			one copy and the warnings are harmless.
+		-->
+		<NoWarn>$(NoWarn);NU5118</NoWarn>
   </PropertyGroup>
+
+  <!-- dotnet tool packaging -->
+  <PropertyGroup>
+		<IsPackable>true</IsPackable>
+		<PackAsTool>true</PackAsTool>
+    <ToolCommandName>utgkit</ToolCommandName>
+    <PackageId>UtgKit</PackageId>
+    <PackageOutputPath>$(MSBuildThisFileDirectory)..\..\nupkg</PackageOutputPath>
+    <Version>0.7.0</Version>
+    <Authors>Brian Postlethwaite</Authors>
+    <Description>UTG Kit - toolkit (Blazor UI) for Universal Terminology Governance contributors working with terminology.hl7.org.</Description>
+    <PackageTags>fhir;hl7;terminology;utg;tho;blazor</PackageTags>
+    <PackageProjectUrl>https://github.com/brianpos/utg-kit</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/brianpos/utg-kit</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageReadmeFile>readme.md</PackageReadmeFile>
+    <PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
+    <!-- Ensure Blazor/web static assets ship with the tool package. -->
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+		<RollForward>LatestMajor</RollForward>
+
+		<!--
+			`dotnet pack` on a Web SDK project packs BUILD output, which omits the
+      Static Web Assets manifest, the scoped-css bundle (UtgKit.Web.styles.css)
+      and _framework/_content assets from RCL references. Force pack to use
+      PUBLISH output so everything Blazor needs at runtime ships in the tool.
+    -->
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+    <_IsPacking Condition="'$(IsPacking)' == ''">false</_IsPacking>
+  </PropertyGroup>
+
+  <!--
+    Hook publish into the pack pipeline and redirect the tool's payload to the
+    publish output directory.
+  -->
+  <Target Name="PublishBeforePack"
+          BeforeTargets="GenerateNuspec"
+          Condition="'$(IsPackingTool)' == 'true' or '$(_IsPacking)' == 'true' or '$(IsPacking)' == 'true'">
+    <MSBuild Projects="$(MSBuildProjectFullPath)"
+             Targets="Publish"
+             Properties="Configuration=$(Configuration);TargetFramework=$(TargetFramework);PublishDir=$(PublishDir);_IsPublishing=true" />
+  </Target>
+
+  <Target Name="IncludePublishOutputInToolPackage"
+          BeforeTargets="_GetPackageFiles"
+          DependsOnTargets="PublishBeforePack"
+          Condition="'$(IsPackingTool)' == 'true' or '$(_IsPacking)' == 'true' or '$(IsPacking)' == 'true'">
+    <ItemGroup>
+      <_PublishedFiles Include="$(PublishDir)**\*.*" />
+      <None Include="@(_PublishedFiles)"
+            Pack="true"
+            PackagePath="tools\$(TargetFramework)\any\%(RecursiveDir)%(Filename)%(Extension)" />
+    </ItemGroup>
+  </Target>
 
   <ItemGroup>
     <ProjectReference Include="..\UtgKit.Core\UtgKit.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Files surfaced on the NuGet package page. -->
+    <None Include="readme.md" Pack="true" PackagePath="\" />
+    <None Include="..\..\LICENSE.txt" Pack="true" PackagePath="\" />
   </ItemGroup>
 
   <ItemGroup>
