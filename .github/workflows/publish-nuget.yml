@@ -1,0 +1,103 @@
+name: Publish UtgKit to NuGet
+
+# Manually triggered from the Actions tab. Optionally override the version
+# defined in src/UtgKit.Web/UtgKit.Web.csproj.
+on:
+  workflow_dispatch:
+	inputs:
+	  version:
+		description: "Package version to publish (leave blank to use the version in the .csproj)"
+		required: false
+		type: string
+	  dry_run:
+		description: "Pack only — do not push to NuGet.org"
+		required: false
+		type: boolean
+		default: false
+
+permissions:
+  contents: write   # needed to create the git tag / release
+
+jobs:
+  publish:
+	name: Pack & Push
+	runs-on: ubuntu-latest
+
+	env:
+	  DOTNET_NOLOGO: true
+	  DOTNET_CLI_TELEMETRY_OPTOUT: true
+	  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+	  CONFIGURATION: Release
+	  PROJECT: src/UtgKit.Web/UtgKit.Web.csproj
+	  NUPKG_DIR: nupkg
+
+	steps:
+	  - name: Checkout
+		uses: actions/checkout@v4
+		with:
+		  fetch-depth: 0
+
+	  - name: Setup .NET 10
+		uses: actions/setup-dotnet@v4
+		with:
+		  dotnet-version: '10.0.x'
+
+	  - name: Restore
+		run: dotnet restore src/UtgKit.sln
+
+	  - name: Build
+		run: dotnet build src/UtgKit.sln -c $CONFIGURATION --no-restore
+
+	  - name: Test
+		run: dotnet test src/UtgKit.sln -c $CONFIGURATION --no-build --no-restore --verbosity normal
+
+	  - name: Resolve version
+		id: ver
+		shell: bash
+		run: |
+		  if [ -n "${{ inputs.version }}" ]; then
+			echo "version=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+		  else
+			v=$(grep -oPm1 "(?<=<Version>)[^<]+" "$PROJECT")
+			echo "version=$v" >> "$GITHUB_OUTPUT"
+		  fi
+
+	  - name: Pack
+		run: >
+		  dotnet pack $PROJECT
+		  -c $CONFIGURATION
+		  -p:IsPacking=true
+		  -p:Version=${{ steps.ver.outputs.version }}
+		  --no-build
+
+	  - name: Upload .nupkg artifact
+		uses: actions/upload-artifact@v4
+		with:
+		  name: UtgKit-${{ steps.ver.outputs.version }}
+		  path: ${{ env.NUPKG_DIR }}/*.nupkg
+		  if-no-files-found: error
+
+	  - name: Push to NuGet.org
+		if: ${{ inputs.dry_run == false }}
+		env:
+		  NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+		run: >
+		  dotnet nuget push "$NUPKG_DIR/*.nupkg"
+		  --api-key "$NUGET_API_KEY"
+		  --source https://api.nuget.org/v3/index.json
+		  --skip-duplicate
+
+	  - name: Tag release
+		if: ${{ inputs.dry_run == false }}
+		env:
+		  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+		run: |
+		  tag="v${{ steps.ver.outputs.version }}"
+		  git config user.name  "github-actions[bot]"
+		  git config user.email "github-actions[bot]@users.noreply.github.com"
+		  if git rev-parse "$tag" >/dev/null 2>&1; then
+			echo "Tag $tag already exists; skipping."
+		  else
+			git tag -a "$tag" -m "UtgKit $tag"
+			git push origin "$tag"
+		  fi
