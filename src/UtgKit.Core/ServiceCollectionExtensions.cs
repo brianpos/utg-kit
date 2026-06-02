@@ -16,9 +16,14 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<ThoFileService>();
         services.AddSingleton<ThoResourceResolver>();
         services.AddSingleton<ValueSetExpansionService>();
-        services.AddHttpClient<ImportCodeSystemService>();
-        services.AddHttpClient<ImportValueSetService>();
+        services.AddHttpClient<ImportCodeSystemService>(ConfigureClient);
+        services.AddHttpClient<ImportValueSetService>(ConfigureClient);
         services.AddHostedService<ThoFileWatcher>();
         return services;
     }
+
+	static internal void ConfigureClient(HttpClient client)
+	{
+		client.DefaultRequestHeaders.UserAgent.Add(new System.Net.Http.Headers.ProductInfoHeaderValue("UtgKit", "0.10.0"));
+	}
 }

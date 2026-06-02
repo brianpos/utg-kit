@@ -24,7 +24,7 @@ public class ValueSetExpansionService
     /// existing expansion. Returns <c>true</c> when an expansion was added.
     /// The ValueSet is modified in place.
     /// </summary>
-    public bool TryExpand(ValueSet valueSet)
+    public async Task<bool> TryExpandAsync(ValueSet valueSet, CancellationToken cancellationToken = default)
     {
         if (valueSet.Expansion?.Contains?.Count > 0)
             return false;
@@ -33,11 +33,13 @@ public class ValueSetExpansionService
         {
             var settings = new ValueSetExpanderSettings { ValueSetSource = _resolver };
             var expander = new ValueSetExpander(settings);
-            expander.Expand(valueSet);
+            await expander.ExpandAsync(valueSet).ConfigureAwait(false);
             return valueSet.Expansion?.Contains?.Count > 0;
         }
         catch (Exception ex)
         {
+            // Fallback to ts.fhir.org here
+
             _logger.LogDebug(ex, "Could not expand ValueSet {Id}", valueSet.Id);
             return false;
         }

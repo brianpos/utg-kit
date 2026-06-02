@@ -1,5 +1,8 @@
+using System.Text.Json;
+using System.Xml;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
+using Hl7.Fhir.Utility;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using FhirList = Hl7.Fhir.Model.List;
@@ -18,6 +21,29 @@ public class ThoFileService
     private readonly FhirXmlSerializer _xmlSerializer = new(new SerializerSettings { Pretty = true });
     private readonly FhirJsonSerializer _jsonSerializer = new(new SerializerSettings { Pretty = true });
     private readonly ILogger<ThoFileService> _logger;
+
+    private readonly FhirJsonPocoDeserializer _jsonDeserializer = new(new FhirJsonPocoDeserializerSettings
+    {
+        OnPrimitiveParseFailed = (ref Utf8JsonReader reader, Type targetType, object? originalValue, FhirJsonException originalException) =>
+        {
+            try
+            {
+                var convertedValue = PrimitiveTypeConverter.ConvertTo(originalValue, targetType);
+                return (convertedValue, originalException);
+            }
+            catch
+            {
+                return (null, originalException);
+            }
+        },
+        AnnotateResourceParseExceptions = true,
+        ValidateOnFailedParse = true
+    });
+
+    private readonly FhirXmlPocoDeserializer _xmlDeserializer = new(new FhirXmlPocoDeserializerSettings
+    {
+        ValidateOnFailedParse = true
+    });
 
     private readonly object _indexLock = new();
     private readonly SemaphoreSlim _asyncIndexLock = new(1, 1);
@@ -599,6 +625,13 @@ public class ThoFileService
     /// </summary>
     public bool ReindexFile(string filePath)
     {
+        // Important: never raise IndexChanged / ParsingErrorsChanged while holding
+        // _indexLock. Subscribers can do arbitrary work (including calls back into
+        // ThoFileService / async resolvers) which can deadlock if the lock is held.
+        bool result;
+        bool raiseIndexChanged = false;
+        bool raiseParsingErrorsChanged = false;
+
         lock (_indexLock)
         {
             if (_index is null)
@@ -613,40 +646,51 @@ public class ThoFileService
                 if (removed || errorCleared)
                 {
                     _logger.LogInformation("Removed deleted file from index: {Path}", filePath);
-                    IndexChanged?.Invoke();
-                    if (errorCleared) ParsingErrorsChanged?.Invoke();
+                    raiseIndexChanged = true;
+                    if (errorCleared) raiseParsingErrorsChanged = true;
                 }
-                return removed;
+                result = removed;
             }
-
-            var errorCountBefore = GetParsingErrorCount();
-            var resource = ParseResource<Resource>(filePath);
-            if (resource?.Id is null)
+            else
             {
-                // ParseResource recorded the error (if any) — notify only if the set changed.
-                if (GetParsingErrorCount() != errorCountBefore)
-                    ParsingErrorsChanged?.Invoke();
-                if (removed)
+                var errorCountBefore = GetParsingErrorCount();
+                var resource = ParseResource<Resource>(filePath);
+                if (resource?.Id is null)
                 {
-                    _logger.LogInformation("Removed unparseable file from index: {Path}", filePath);
-                    IndexChanged?.Invoke();
+                    // ParseResource recorded the error (if any) — notify only if the set changed.
+                    if (GetParsingErrorCount() != errorCountBefore)
+                        raiseParsingErrorsChanged = true;
+                    if (removed)
+                    {
+                        _logger.LogInformation("Removed unparseable file from index: {Path}", filePath);
+                        raiseIndexChanged = true;
+                    }
+                    result = removed;
                 }
-                return removed;
-            }
+                else
+                {
+                    // File parsed successfully — clear any previous error
+                    if (ClearParsingError(filePath))
+                        raiseParsingErrorsChanged = true;
 
-            // File parsed successfully — clear any previous error
-            if (ClearParsingError(filePath))
-                ParsingErrorsChanged?.Invoke();
-
-            var added = AddToIndex(_index, filePath, resource);
-            if (added || removed)
-            {
-                _logger.LogInformation("Reindexed file: {Path} ({Type}/{Id})",
-                    filePath, resource.TypeName, resource.Id);
-                IndexChanged?.Invoke();
+                    var added = AddToIndex(_index, filePath, resource);
+                    if (added || removed)
+                    {
+                        _logger.LogInformation("Reindexed file: {Path} ({Type}/{Id})",
+                            filePath, resource.TypeName, resource.Id);
+                        raiseIndexChanged = true;
+                    }
+                    result = added || removed;
+                }
             }
-            return added || removed;
         }
+
+        // Fire events outside the lock so subscribers can safely re-enter the service
+        // (and so sync-over-async work in subscribers can't deadlock the watcher thread).
+        if (raiseIndexChanged) IndexChanged?.Invoke();
+        if (raiseParsingErrorsChanged) ParsingErrorsChanged?.Invoke();
+
+        return result;
     }
 
     /// <summary>
@@ -1186,9 +1230,36 @@ public class ThoFileService
         try
         {
             var content = File.ReadAllText(path);
-            return path.EndsWith(".json", StringComparison.OrdinalIgnoreCase)
-                ? _jsonParser.Parse<T>(content)
-                : _xmlParser.Parse<T>(content);
+            Resource resource;
+            if (path.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
+            {
+                resource = _jsonDeserializer.DeserializeResource(content);
+            }
+            else
+            {
+                using var reader = XmlReader.Create(new StringReader(content));
+                resource = _xmlDeserializer.DeserializeResource(reader);
+            }
+            return resource as T;
+        }
+        catch (DeserializationFailedException ex)
+        {
+            // The POCO de-serializer can provide a partial result for non-fatal errors
+            if (ex.PartialResult is T partialResource)
+            {
+                var issues = string.Join("; ", ex.Exceptions.Select(e => e.Message).Where(m => !m.Contains("is not in the correct order") && !m.Contains("The 'schemaLocation' attribute is disallowed")));
+                if (!string.IsNullOrEmpty(issues))
+                {
+                    _logger.LogWarning("Parsed {Path} with non-fatal issues: {Issues}", path, issues);
+                    AddParsingError(path, $"Parsed with warnings: {issues}");
+                }
+                return partialResource;
+            }
+
+            var errorMessage = string.Join("; ", ex.Exceptions.Select(e => e.Message));
+            _logger.LogDebug(ex, "Skipped file during indexing: {Path}", path);
+            AddParsingError(path, errorMessage);
+            return null;
         }
         catch (Exception ex)
         {

@@ -238,14 +238,14 @@ else
                 if (c.System is not null) yield return c.System;
     }
 
-    protected override void OnParametersSet()
+    protected override async System.Threading.Tasks.Task OnParametersSetAsync()
     {
         ThoFileService.IndexChanged -= OnIndexChanged;
         ThoFileService.IndexChanged += OnIndexChanged;
-        LoadData();
+        await LoadDataAsync();
     }
 
-    private void LoadData()
+	private async System.Threading.Tasks.Task LoadDataAsync()
     {
         loadedCodeSystems.Clear();
         valueSet = ThoFileService.LoadValueSet(Id);
@@ -261,9 +261,10 @@ else
             jsonContent = ThoFileService.SerializeToJson(valueSet);
 
             // If the ValueSet has no expansion, try to expand it using local CodeSystems.
-            // This only affects the Narrative tab rendering.
+            // This only affects the Narrative tab rendering. Use the async API to
+            // avoid sync-over-async deadlocks on the renderer SynchronizationContext.
             wasExpanded = valueSet.Expansion?.Contains?.Count is null or 0
-                && ExpansionService.TryExpand(valueSet);
+                && await ExpansionService.TryExpandAsync(valueSet);
 
             // Build a lookup of CodeSystem canonical URLs to local IDs for navigation links.
             codeSystemIds = CollectSystemUrls(valueSet)
@@ -278,9 +279,12 @@ else
 
     private void OnIndexChanged()
     {
-        InvokeAsync(() =>
+        // IndexChanged is raised by ThoFileService on a background thread.
+        // Marshal back onto the renderer's SynchronizationContext, but do the
+        // work asynchronously so we never block the renderer with sync-over-async.
+        _ = InvokeAsync(async () =>
         {
-            LoadData();
+            await LoadDataAsync();
             StateHasChanged();
         });
     }
