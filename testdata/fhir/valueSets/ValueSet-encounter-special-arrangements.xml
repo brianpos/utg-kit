@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ValueSet xmlns="http://hl7.org/fhir">
+  <id value="encounter-special-arrangements" />
+  <meta>
+    <lastUpdated value="2026-03-10T17:33:07.571+00:00" />
+  </meta>
+  <text>
+    <status value="generated" />
+    <div xmlns="http://www.w3.org/1999/xhtml">
+      <p class="res-header-id">
+        <b>Generated Narrative: ValueSet encounter-special-arrangements</b>
+      </p>
+      <a name="encounter-special-arrangements"></a>
+      <a name="hcencounter-special-arrangements"></a>
+      <ul>
+        <li>Include all codes defined in <a href="http://terminology.hl7.org/7.1.0/CodeSystem-encounter-special-arrangements.html"><code>http://terminology.hl7.org/CodeSystem/encounter-special-arrangements</code></a><span title="Version is not explicitly stated, which means it is fixed to 1.0.1, the version found through the package references"> version 📦1.0.1</span></li>
+      </ul>
+    </div>
+  </text>
+  <extension url="http://hl7.org/fhir/StructureDefinition/structuredefinition-wg">
+    <valueCode value="pa" />
+  </extension>
+  <extension url="http://hl7.org/fhir/StructureDefinition/structuredefinition-standards-status">
+    <valueCode value="normative" />
+  </extension>
+  <url value="http://hl7.org/fhir/ValueSet/encounter-special-arrangements" />
+  <identifier>
+    <system value="urn:ietf:rfc:3986" />
+    <value value="urn:oid:2.16.840.1.113883.4.642.3.253" />
+  </identifier>
+  <identifier>
+    <use value="old" />
+    <system value="urn:ietf:rfc:3986" />
+    <value value="urn:oid:2.16.840.1.113883.4.642.3.248" />
+  </identifier>
+  <identifier>
+    <use value="old" />
+    <system value="urn:ietf:rfc:3986" />
+    <value value="urn:oid:2.16.840.1.113883.4.642.2.141" />
+  </identifier>
+  <version value="6.0.0-ballot4" />
+  <name value="SpecialArrangements" />
+  <title value="Special Arrangements" />
+  <status value="active" />
+  <experimental value="false" />
+  <publisher value="FHIR Project team" />
+  <contact>
+    <telecom>
+      <system value="url" />
+      <value value="http://hl7.org/fhir" />
+    </telecom>
+  </contact>
+  <description value="This value set defines a set of codes that can be used to indicate the kinds of special arrangements in place for a patients visit." />
+  <jurisdiction>
+    <coding>
+      <system value="http://unstats.un.org/unsd/methods/m49/m49.htm" />
+      <code value="001" />
+      <display value="World" />
+    </coding>
+  </jurisdiction>
+  <compose>
+    <include>
+      <system value="http://terminology.hl7.org/CodeSystem/encounter-special-arrangements" />
+    </include>
+  </compose>
+</ValueSet>

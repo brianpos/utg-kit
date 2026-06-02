@@ -28,9 +28,9 @@ public class ThoFileServiceTests
     {
         var index = _service.GetCodeSystemIndex();
 
-        // fhir/codeSystems: accepting-patients
+        // fhir/codeSystems: accepting-patients + 8 encounter/eligibility CodeSystems
         // v2/codeSystems: v2-0001, v2-0002, v2-0003, v2-0004, v2-0006
-        Assert.Equal(6, index.Count);
+        Assert.Equal(14, index.Count);
     }
 
     [Fact]
@@ -123,9 +123,9 @@ public class ThoFileServiceTests
     {
         var index = _service.GetValueSetIndex();
 
-        // fhir/valueSets: accepting-patients
+        // fhir/valueSets: accepting-patients + 5 additional ValueSets
         // v2/valueSets: v2-0001 through v2-0006
-        Assert.Equal(7, index.Count);
+        Assert.Equal(12, index.Count);
     }
 
     [Fact]

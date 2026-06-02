@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CodeSystem xmlns="http://hl7.org/fhir">
+  <id value="encounter-reason-use" />
+  <meta>
+    <lastUpdated value="2026-03-11T04:33:07.571+11:00" />
+  </meta>
+  <text>
+    <status value="generated" />
+    <div xmlns="http://www.w3.org/1999/xhtml">
+      <p class="res-header-id">
+        <b>Generated Narrative: CodeSystem encounter-reason-use</b>
+      </p>
+      <a name="encounter-reason-use"></a>
+      <a name="hcencounter-reason-use"></a>
+      <div style="display: inline-block; background-color: #d9e0e7; padding: 6px; margin: 4px; border: 1px solid #8da1b4; border-radius: 5px; line-height: 60%">
+        <p style="margin-bottom: 0px">Last updated: 2021-01-05T10:01:24.148+11:00</p>
+      </div>
+      <p>This case-sensitive code system <code>http://hl7.org/fhir/encounter-reason-use</code> defines the following codes:</p>
+      <table class="codes">
+        <tr>
+          <td style="white-space:nowrap">
+            <b>Code</b>
+          </td>
+          <td>
+            <b>Display</b>
+          </td>
+          <td>
+            <b>Definition</b>
+          </td>
+        </tr>
+        <tr>
+          <td style="white-space:nowrap">CC<a name="encounter-reason-use-CC"></a></td>
+          <td>Chief Complaint</td>
+          <td>Patient's stated reason for seeking care.</td>
+        </tr>
+        <tr>
+          <td style="white-space:nowrap">HC<a name="encounter-reason-use-HC"></a></td>
+          <td>Health Concern</td>
+          <td>An identified issue, risk, or concern requiring monitoring or management.</td>
+        </tr>
+        <tr>
+          <td style="white-space:nowrap">AD<a name="encounter-reason-use-AD"></a></td>
+          <td>Admitting Diagnosis</td>
+          <td>Diagnosis (often provisional) documented as the reason for admission to the facility.</td>
+        </tr>
+        <tr>
+          <td style="white-space:nowrap">RV<a name="encounter-reason-use-RV"></a></td>
+          <td>Reason for Visit</td>
+          <td>Provider-recognized reason for the encounter (may differ from chief complaint).</td>
+        </tr>
+        <tr>
+          <td style="white-space:nowrap">HM<a name="encounter-reason-use-HM"></a></td>
+          <td>Health Maintenance (including screening)</td>
+          <td>Preventive or routine services (e.g., screening, immunization) performed to maintain health.</td>
+        </tr>
+      </table>
+    </div>
+  </text>
+  <extension url="http://hl7.org/fhir/StructureDefinition/structuredefinition-wg">
+    <valueCode value="pa" />
+  </extension>
+  <extension url="http://hl7.org/fhir/StructureDefinition/structuredefinition-standards-status">
+    <valueCode value="informative" />
+  </extension>
+  <extension url="http://hl7.org/fhir/StructureDefinition/structuredefinition-fmm">
+    <valueInteger value="0" />
+  </extension>
+  <url value="http://hl7.org/fhir/encounter-reason-use" />
+  <identifier>
+    <system value="urn:ietf:rfc:3986" />
+    <value value="urn:oid:2.16.840.1.113883.4.642.4.2114" />
+  </identifier>
+  <version value="6.0.0-ballot4" />
+  <name value="EncounterReasonUse" />
+  <title value="Encounter Reason Use" />
+  <status value="active" />
+  <experimental value="false" />
+  <date value="2021-01-05T10:01:24+11:00" />
+  <publisher value="HL7 (FHIR Project)" />
+  <contact>
+    <telecom>
+      <system value="url" />
+      <value value="http://hl7.org/fhir" />
+    </telecom>
+    <telecom>
+      <system value="email" />
+      <value value="fhir@lists.hl7.org" />
+    </telecom>
+  </contact>
+  <description value="Encounter Reason Use" />
+  <jurisdiction>
+    <coding>
+      <system value="http://unstats.un.org/unsd/methods/m49/m49.htm" />
+      <code value="001" />
+      <display value="World" />
+    </coding>
+  </jurisdiction>
+  <caseSensitive value="true" />
+  <valueSet value="http://hl7.org/fhir/ValueSet/encounter-reason-use" />
+  <content value="complete" />
+  <concept>
+    <code value="CC" />
+    <display value="Chief Complaint" />
+    <definition value="Patient's stated reason for seeking care." />
+  </concept>
+  <concept>
+    <code value="HC" />
+    <display value="Health Concern" />
+    <definition value="An identified issue, risk, or concern requiring monitoring or management." />
+  </concept>
+  <concept>
+    <code value="AD" />
+    <display value="Admitting Diagnosis" />
+    <definition value="Diagnosis (often provisional) documented as the reason for admission to the facility." />
+  </concept>
+  <concept>
+    <code value="RV" />
+    <display value="Reason for Visit" />
+    <definition value="Provider-recognized reason for the encounter (may differ from chief complaint)." />
+  </concept>
+  <concept>
+    <code value="HM" />
+    <display value="Health Maintenance (including screening)" />
+    <definition value="Preventive or routine services (e.g., screening, immunization) performed to maintain health." />
+  </concept>
+</CodeSystem>

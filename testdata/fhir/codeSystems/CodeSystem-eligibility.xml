@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CodeSystem xmlns="http://hl7.org/fhir">
+  <id value="eligibility" />
+  <meta>
+    <lastUpdated value="2026-03-10T17:33:07.571+00:00" />
+  </meta>
+  <text>
+    <status value="generated" />
+    <div xmlns="http://www.w3.org/1999/xhtml">
+      <p class="res-header-id">
+        <b>Generated Narrative: CodeSystem eligibility</b>
+      </p>
+      <a name="eligibility"></a>
+      <a name="hceligibility"></a>
+      <p>This case-sensitive code system <code>http://hl7.org/fhir/eligibility</code> defines the following codes:</p>
+      <table class="codes">
+        <tr>
+          <td style="white-space:nowrap">
+            <b>Code</b>
+          </td>
+          <td>
+            <b>Display</b>
+          </td>
+          <td>
+            <b>Definition</b>
+          </td>
+        </tr>
+        <tr>
+          <td style="white-space:nowrap">veterans<a name="eligibility-veterans"></a></td>
+          <td>Veterans</td>
+          <td>Only Veterans are eligible to receive services associated with this code</td>
+        </tr>
+        <tr>
+          <td style="white-space:nowrap">pediatric-patients<a name="eligibility-pediatric-patients"></a></td>
+          <td>Pediatric patients</td>
+          <td>Pediatric Patients</td>
+        </tr>
+        <tr>
+          <td style="white-space:nowrap">existing-patients<a name="eligibility-existing-patients"></a></td>
+          <td>Existing Patients</td>
+          <td>Existing Patients</td>
+        </tr>
+        <tr>
+          <td style="white-space:nowrap">new-patients<a name="eligibility-new-patients"></a></td>
+          <td>New patients</td>
+          <td>New patients</td>
+        </tr>
+        <tr>
+          <td style="white-space:nowrap">low-income-patients<a name="eligibility-low-income-patients"></a></td>
+          <td>Low-income patients</td>
+          <td>Low-income patients</td>
+        </tr>
+        <tr>
+          <td style="white-space:nowrap">uninsured-patients<a name="eligibility-uninsured-patients"></a></td>
+          <td>Uninsured patients</td>
+          <td>Uninsured patients</td>
+        </tr>
+        <tr>
+          <td style="white-space:nowrap">renal-patients<a name="eligibility-renal-patients"></a></td>
+          <td>Renal patients</td>
+          <td>Renal patients (e.g., for dialysis services)</td>
+        </tr>
+        <tr>
+          <td style="white-space:nowrap">specialist-referral-required<a name="eligibility-specialist-referral-required"></a></td>
+          <td>Specialist referral required</td>
+          <td>A specific specialist referral is required to receive services associated with this code</td>
+        </tr>
+        <tr>
+          <td style="white-space:nowrap">assessment-required<a name="eligibility-assessment-required"></a></td>
+          <td>Assessment required</td>
+          <td>An assessment is required to receive services associated with this code</td>
+        </tr>
+      </table>
+    </div>
+  </text>
+  <extension url="http://hl7.org/fhir/StructureDefinition/structuredefinition-wg">
+    <valueCode value="pa" />
+  </extension>
+  <extension url="http://hl7.org/fhir/StructureDefinition/structuredefinition-standards-status">
+    <valueCode value="informative" />
+  </extension>
+  <url value="http://hl7.org/fhir/eligibility" />
+  <version value="6.0.0-ballot4" />
+  <name value="Eligibility" />
+  <title value="Eligibility Characteristics" />
+  <status value="active" />
+  <experimental value="false" />
+  <publisher value="HL7 International" />
+  <description value="Example set of HealthcareService eligibility codes" />
+  <jurisdiction>
+    <coding>
+      <system value="http://unstats.un.org/unsd/methods/m49/m49.htm" />
+      <code value="001" />
+      <display value="World" />
+    </coding>
+  </jurisdiction>
+  <caseSensitive value="true" />
+  <content value="complete" />
+  <concept>
+    <code value="veterans" />
+    <display value="Veterans" />
+    <definition value="Only Veterans are eligible to receive services associated with this code" />
+  </concept>
+  <concept>
+    <code value="pediatric-patients" />
+    <display value="Pediatric patients" />
+    <definition value="Pediatric Patients" />
+  </concept>
+  <concept>
+    <code value="existing-patients" />
+    <display value="Existing Patients" />
+    <definition value="Existing Patients" />
+  </concept>
+  <concept>
+    <code value="new-patients" />
+    <display value="New patients" />
+    <definition value="New patients" />
+  </concept>
+  <concept>
+    <code value="low-income-patients" />
+    <display value="Low-income patients" />
+    <definition value="Low-income patients" />
+  </concept>
+  <concept>
+    <code value="uninsured-patients" />
+    <display value="Uninsured patients" />
+    <definition value="Uninsured patients" />
+  </concept>
+  <concept>
+    <code value="renal-patients" />
+    <display value="Renal patients" />
+    <definition value="Renal patients (e.g., for dialysis services)" />
+  </concept>
+  <concept>
+    <code value="specialist-referral-required" />
+    <display value="Specialist referral required" />
+    <definition value="A specific specialist referral is required to receive services associated with this code" />
+  </concept>
+  <concept>
+    <code value="assessment-required" />
+    <display value="Assessment required" />
+    <definition value="An assessment is required to receive services associated with this code" />
+  </concept>
+</CodeSystem>

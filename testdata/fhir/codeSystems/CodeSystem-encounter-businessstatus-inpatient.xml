@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CodeSystem xmlns="http://hl7.org/fhir">
+  <id value="encounter-businessstatus-inpatient" />
+  <meta>
+    <lastUpdated value="2026-03-10T17:33:07.571+00:00" />
+  </meta>
+  <text>
+    <status value="generated" />
+    <div xmlns="http://www.w3.org/1999/xhtml">
+      <p class="res-header-id">
+        <b>Generated Narrative: CodeSystem encounter-businessstatus-inpatient</b>
+      </p>
+      <a name="encounter-businessstatus-inpatient"></a>
+      <a name="hcencounter-businessstatus-inpatient"></a>
+      <div style="display: inline-block; background-color: #d9e0e7; padding: 6px; margin: 4px; border: 1px solid #8da1b4; border-radius: 5px; line-height: 60%">
+        <p style="margin-bottom: 0px">Last updated: 2025-10-29T00:00:00Z</p>
+      </div>
+      <p>This case-sensitive code system <code>http://hl7.org/fhir/encounter-businessstatus-inpatient</code> defines the following codes:</p>
+      <table class="codes">
+        <tr>
+          <td style="white-space:nowrap">
+            <b>Code</b>
+          </td>
+          <td>
+            <b>Display</b>
+          </td>
+          <td>
+            <b>Definition</b>
+          </td>
+        </tr>
+        <tr>
+          <td style="white-space:nowrap">pre-admit<a name="encounter-businessstatus-inpatient-pre-admit"></a></td>
+          <td>Pre-admit</td>
+          <td>The patient has been pre-admitted but has not yet arrived at the facility.</td>
+        </tr>
+        <tr>
+          <td style="white-space:nowrap">pend-admit<a name="encounter-businessstatus-inpatient-pend-admit"></a></td>
+          <td>Pending Admit</td>
+          <td>The patient admission is pending.</td>
+        </tr>
+        <tr>
+          <td style="white-space:nowrap">admit<a name="encounter-businessstatus-inpatient-admit"></a></td>
+          <td>Admitted</td>
+          <td>The patient has been admitted to the facility.</td>
+        </tr>
+        <tr>
+          <td style="white-space:nowrap">discharge<a name="encounter-businessstatus-inpatient-discharge"></a></td>
+          <td>Discharge</td>
+          <td>The patient is in the process of being discharged or has been discharged.</td>
+        </tr>
+        <tr>
+          <td style="white-space:nowrap">unknown<a name="encounter-businessstatus-inpatient-unknown"></a></td>
+          <td>Unknown</td>
+          <td>The inpatient business status is unknown. Note that "unknown" is a value of last resort and every attempt should be made to provide a meaningful value other than "unknown".</td>
+        </tr>
+      </table>
+    </div>
+  </text>
+  <extension url="http://hl7.org/fhir/StructureDefinition/structuredefinition-wg">
+    <valueCode value="pa" />
+  </extension>
+  <extension url="http://hl7.org/fhir/StructureDefinition/structuredefinition-standards-status">
+    <valueCode value="normative" />
+  </extension>
+  <extension url="http://hl7.org/fhir/StructureDefinition/structuredefinition-fmm">
+    <valueInteger value="1" />
+  </extension>
+  <url value="http://hl7.org/fhir/encounter-businessstatus-inpatient" />
+  <version value="6.0.0-ballot4" />
+  <name value="EncounterBusinessStatusInpatient" />
+  <title value="Encounter Business Status - Inpatient" />
+  <status value="active" />
+  <experimental value="false" />
+  <date value="2025-10-29T00:00:00+00:00" />
+  <publisher value="HL7 (FHIR Project)" />
+  <contact>
+    <telecom>
+      <system value="url" />
+      <value value="http://hl7.org/fhir" />
+    </telecom>
+    <telecom>
+      <system value="email" />
+      <value value="fhir@lists.hl7.org" />
+    </telecom>
+  </contact>
+  <description value="Business statuses for inpatient encounters." />
+  <jurisdiction>
+    <coding>
+      <system value="http://unstats.un.org/unsd/methods/m49/m49.htm" />
+      <code value="001" />
+      <display value="World" />
+    </coding>
+  </jurisdiction>
+  <caseSensitive value="true" />
+  <valueSet value="http://hl7.org/fhir/ValueSet/encounter-businessstatus-inpatient" />
+  <content value="complete" />
+  <concept>
+    <code value="pre-admit" />
+    <display value="Pre-admit" />
+    <definition value="The patient has been pre-admitted but has not yet arrived at the facility." />
+  </concept>
+  <concept>
+    <code value="pend-admit" />
+    <display value="Pending Admit" />
+    <definition value="The patient admission is pending." />
+  </concept>
+  <concept>
+    <code value="admit" />
+    <display value="Admitted" />
+    <definition value="The patient has been admitted to the facility." />
+  </concept>
+  <concept>
+    <code value="discharge" />
+    <display value="Discharge" />
+    <definition value="The patient is in the process of being discharged or has been discharged." />
+  </concept>
+  <concept>
+    <code value="unknown" />
+    <display value="Unknown" />
+    <definition value="The inpatient business status is unknown. Note that &quot;unknown&quot; is a value of last resort and every attempt should be made to provide a meaningful value other than &quot;unknown&quot;." />
+  </concept>
+</CodeSystem>

@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CodeSystem xmlns="http://hl7.org/fhir">
+  <id value="encounter-businessstatus-outpatient" />
+  <meta>
+    <lastUpdated value="2026-03-10T17:33:07.571+00:00" />
+  </meta>
+  <text>
+    <status value="generated" />
+    <div xmlns="http://www.w3.org/1999/xhtml">
+      <p class="res-header-id">
+        <b>Generated Narrative: CodeSystem encounter-businessstatus-outpatient</b>
+      </p>
+      <a name="encounter-businessstatus-outpatient"></a>
+      <a name="hcencounter-businessstatus-outpatient"></a>
+      <div style="display: inline-block; background-color: #d9e0e7; padding: 6px; margin: 4px; border: 1px solid #8da1b4; border-radius: 5px; line-height: 60%">
+        <p style="margin-bottom: 0px">Last updated: 2025-10-29T00:00:00Z</p>
+      </div>
+      <p>This case-sensitive code system <code>http://hl7.org/fhir/encounter-businessstatus-outpatient</code> defines the following codes:</p>
+      <table class="codes">
+        <tr>
+          <td style="white-space:nowrap">
+            <b>Code</b>
+          </td>
+          <td>
+            <b>Display</b>
+          </td>
+          <td>
+            <b>Definition</b>
+          </td>
+        </tr>
+        <tr>
+          <td style="white-space:nowrap">check-in<a name="encounter-businessstatus-outpatient-check-in"></a></td>
+          <td>Check-in</td>
+          <td>The patient has checked in for the outpatient visit.</td>
+        </tr>
+        <tr>
+          <td style="white-space:nowrap">check-out<a name="encounter-businessstatus-outpatient-check-out"></a></td>
+          <td>Check-out</td>
+          <td>The patient has checked out from the outpatient visit.</td>
+        </tr>
+      </table>
+    </div>
+  </text>
+  <extension url="http://hl7.org/fhir/StructureDefinition/structuredefinition-wg">
+    <valueCode value="pa" />
+  </extension>
+  <extension url="http://hl7.org/fhir/StructureDefinition/structuredefinition-standards-status">
+    <valueCode value="normative" />
+  </extension>
+  <extension url="http://hl7.org/fhir/StructureDefinition/structuredefinition-fmm">
+    <valueInteger value="1" />
+  </extension>
+  <url value="http://hl7.org/fhir/encounter-businessstatus-outpatient" />
+  <version value="6.0.0-ballot4" />
+  <name value="EncounterBusinessStatusOutpatient" />
+  <title value="Encounter Business Status - Outpatient" />
+  <status value="active" />
+  <experimental value="false" />
+  <date value="2025-10-29T00:00:00+00:00" />
+  <publisher value="HL7 (FHIR Project)" />
+  <contact>
+    <telecom>
+      <system value="url" />
+      <value value="http://hl7.org/fhir" />
+    </telecom>
+    <telecom>
+      <system value="email" />
+      <value value="fhir@lists.hl7.org" />
+    </telecom>
+  </contact>
+  <description value="Business statuses for outpatient encounters." />
+  <jurisdiction>
+    <coding>
+      <system value="http://unstats.un.org/unsd/methods/m49/m49.htm" />
+      <code value="001" />
+      <display value="World" />
+    </coding>
+  </jurisdiction>
+  <caseSensitive value="true" />
+  <valueSet value="http://hl7.org/fhir/ValueSet/encounter-businessstatus-outpatient" />
+  <content value="complete" />
+  <concept>
+    <code value="check-in" />
+    <display value="Check-in" />
+    <definition value="The patient has checked in for the outpatient visit." />
+  </concept>
+  <concept>
+    <code value="check-out" />
+    <display value="Check-out" />
+    <definition value="The patient has checked out from the outpatient visit." />
+  </concept>
+</CodeSystem>

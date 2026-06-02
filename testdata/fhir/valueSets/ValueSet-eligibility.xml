@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ValueSet xmlns="http://hl7.org/fhir">
+  <id value="eligibility" />
+  <meta>
+    <lastUpdated value="2026-03-10T17:33:07.571+00:00" />
+  </meta>
+  <text>
+    <status value="generated" />
+    <div xmlns="http://www.w3.org/1999/xhtml">
+      <p class="res-header-id">
+        <b>Generated Narrative: ValueSet eligibility</b>
+      </p>
+      <a name="eligibility"></a>
+      <a name="hceligibility"></a>
+      <ul>
+        <li>Include all codes defined in <a href="codesystem-eligibility.html"><code>http://hl7.org/fhir/eligibility</code></a><span title="Version is not explicitly stated, which means it is fixed to the version provided in this specification"> version 📦6.0.0-ballot4</span></li>
+      </ul>
+    </div>
+  </text>
+  <extension url="http://hl7.org/fhir/StructureDefinition/structuredefinition-wg">
+    <valueCode value="pa" />
+  </extension>
+  <extension url="http://hl7.org/fhir/StructureDefinition/structuredefinition-standards-status">
+    <valueCode value="informative" />
+  </extension>
+  <extension url="http://hl7.org/fhir/StructureDefinition/structuredefinition-fmm">
+    <valueInteger value="1" />
+  </extension>
+  <url value="http://hl7.org/fhir/ValueSet/eligibility" />
+  <version value="6.0.0-ballot4" />
+  <name value="Eligibility" />
+  <title value="Eligibility Characteristics" />
+  <status value="active" />
+  <experimental value="false" />
+  <publisher value="FHIR Project team" />
+  <description value="Example set of HealthcareService eligibility codes" />
+  <jurisdiction>
+    <coding>
+      <system value="http://unstats.un.org/unsd/methods/m49/m49.htm" />
+      <code value="001" />
+      <display value="World" />
+    </coding>
+  </jurisdiction>
+  <compose>
+    <include>
+      <system value="http://hl7.org/fhir/eligibility" />
+    </include>
+  </compose>
+</ValueSet>
